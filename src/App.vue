@@ -224,7 +224,6 @@
 </template>
 
 <script>
-import db from './firebaseInit'
 
 export default {
   name: 'App',
@@ -643,14 +642,6 @@ export default {
       }
     },
     save () {
-      db.collection('data').add(this.editedItem)
-        .then(function (docRef) {
-          console.log('Document written with ID: ', docRef.id)
-        })
-        .catch(function (error) {
-          console.error('Error adding document: ', error)
-        })
-
       this.editedItem.value = this.numberUs(this.editedItem.value)
       if (!this.editedItem.id) {
         this.editedItem.id = new Date()
