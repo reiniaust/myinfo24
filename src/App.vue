@@ -1,3 +1,5 @@
+/* eslint-disable no-eval */
+/* eslint-disable no-eval */
 <template>
   <v-app>
     <v-app-bar app color="primary" dark>
@@ -126,18 +128,18 @@
             </h3>
             <v-list-item-subtitle v-if="currentItem">{{
               new Date(currentItem.id).toLocaleString() +
-                (currentItem.modified
-                  ? ", geändert: " +
-                    new Date(currentItem.modified).toLocaleString()
-                  : "")
+              (currentItem.modified
+                ? ", geändert: " +
+                  new Date(currentItem.modified).toLocaleString()
+                : "")
             }}</v-list-item-subtitle>
             <v-list-item-subtitle
               v-if="currentItem && currentItem.linkId"
               @click="selectItem(getItemById(currentItem.linkId))"
               >{{
                 "Verknüpfung: " +
-                  pathString(getItemById(currentItem.linkId)) +
-                  showItem(getItemById(currentItem.linkId))
+                pathString(getItemById(currentItem.linkId)) +
+                showItem(getItemById(currentItem.linkId))
               }}</v-list-item-subtitle
             >
           </div>
@@ -151,16 +153,16 @@
                   :class="item.deleted ? 'text-decoration-line-through' : ''"
                   v-text="
                     isNull(item.name) +
-                      ' ' +
-                      numberDe(
-                        Math.round(resultEval(calculatedValue(item)) * 1000) /
-                          1000
-                      ) +
-                      ' ' +
-                      isNull(item.unit) +
-                      (item.linkId
-                        ? ' -> ' + showItem(getItemById(item.linkId))
-                        : '')
+                    ' ' +
+                    numberDe(
+                      Math.round(resultEval(calculatedValue(item)) * 1000) /
+                        1000
+                    ) +
+                    ' ' +
+                    isNull(item.unit) +
+                    (item.linkId
+                      ? ' -> ' + showItem(getItemById(item.linkId))
+                      : '')
                   "
                   @click="selectItem(item, true)"
                 ></v-list-item-title>
@@ -203,9 +205,7 @@
         </v-list>
 
         <v-list v-if="linkedItems().length > 0">
-          <v-list-item-subtitle>
-            Verwendungen
-          </v-list-item-subtitle>
+          <v-list-item-subtitle> Verwendungen </v-list-item-subtitle>
           <v-list-item
             v-for="(useItem, i) in linkedItems()"
             :key="i"
@@ -224,12 +224,14 @@
 </template>
 
 <script>
+import db from './firebaseInit'
+
 export default {
-  name: "App",
+  name: 'App',
 
   data: () => ({
     myData: null,
-    //items: null,
+    // items: null,
     withDeletedItems: false,
     selectedItem: null,
     currentItem: null,
@@ -238,106 +240,112 @@ export default {
     copiedItem: null,
     downloaded: false,
     navigateList: [],
-    searchText: "",
-    searchTextOld: "",
+    searchText: '',
+    searchTextOld: '',
     searchIndex: 0,
-    units() {
-      let units = [
-        { name: "" },
-        { name: "Eur" },
-        { name: "St" },
-        { name: "kg" },
-        { name: "to", value: 1000, base: "kg" },
-        { name: "mm" },
-        { name: "cm", value: 10, base: "mm" },
-        { name: "m", value: 1000, base: "mm" },
-        { name: "km", value: 1000 * 1000, base: "mm" },
-        { name: "Min" },
-        { name: "Std", value: 60, base: "Min" },
-        { name: "kWh" },
-        { name: "Tage", singular: "Tag", value: 24 * 60, base: "Min" },
-        { name: "Jahre", singular: "Jahr", value: 24 * 60 * 365, base: "Min" },
-        { name: "Los" },
-        { name: "% Aufschlag" },
-        { name: "% Anteil" },
-      ];
-      let unitsPer = [];
+    units () {
+      const units = [
+        { name: '' },
+        { name: 'Eur' },
+        { name: 'St' },
+        { name: 'kg' },
+        { name: 'to', value: 1000, base: 'kg' },
+        { name: 'mm' },
+        { name: 'cm', value: 10, base: 'mm' },
+        { name: 'm', value: 1000, base: 'mm' },
+        { name: 'km', value: 1000 * 1000, base: 'mm' },
+        { name: 'Min' },
+        { name: 'Std', value: 60, base: 'Min' },
+        { name: 'kWh' },
+        { name: 'Tage', singular: 'Tag', value: 24 * 60, base: 'Min' },
+        { name: 'Jahre', singular: 'Jahr', value: 24 * 60 * 365, base: 'Min' },
+        { name: 'Los' },
+        { name: '% Aufschlag' },
+        { name: '% Anteil' }
+      ]
+      const unitsPer = []
       units.forEach((u1) => {
-        if (!u1.name.includes("%") && u1.name !== "") {
+        if (!u1.name.includes('%') && u1.name !== '') {
           units.forEach((u2) => {
             if (
               u1 !== u2 &&
-              !u2.name.includes("%") &&
-              u2.name !== "" &&
+              !u2.name.includes('%') &&
+              u2.name !== '' &&
               !(u1.unit && u1.unit === u2.name) &&
               !(u2.unit && u2.unit === u1.name)
             ) {
-              let per = u2.singular ? u2.singular : u2.name;
-              unitsPer.push({ name: u1.name + "/" + per });
+              const per = u2.singular ? u2.singular : u2.name
+              unitsPer.push({ name: u1.name + '/' + per })
             }
-          });
+          })
         }
-      });
-      return units.concat(unitsPer);
-    },
+      })
+      return units.concat(unitsPer)
+    }
   }),
   computed: {
     numberEdit: {
-      get: function() {
-        return this.numberDe(this.editedItem.value);
+      get: function () {
+        return this.numberDe(this.editedItem.value)
       },
-      set: function(newValue) {
-        this.editedItem.value = this.numberUs(newValue);
-      },
-    },
-  },
-  mounted() {
-    if (localStorage.getItem("racalc-data") !== null) {
-      this.myData = JSON.parse(localStorage.getItem("racalc-data"));
-      this.myData = this.myData.filter((i) => !(i === null)); // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
-    } else {
-      this.myData = [];
+      set: function (newValue) {
+        this.editedItem.value = this.numberUs(newValue)
+      }
     }
-    //this.items = this.myData.filter((i) => !i.parentId);
-    this.$refs.inputName.focus();
+  },
+  mounted () {
+    if (localStorage.getItem('racalc-data') !== null) {
+      this.myData = JSON.parse(localStorage.getItem('racalc-data'))
+      this.myData = this.myData.filter((i) => !(i === null)) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
+    } else {
+      this.myData = []
+    }
+    // this.$refs.inputName.focus()
+
+    this.$firestore.data.add({
+      firstname: 'Amrani',
+      lastname: 'Houssain'
+    })
   },
   methods: {
-    shownData() {
+    shownData () {
       if (this.withDeletedItems) {
-        return this.myData;
+        return this.myData
       } else {
-        return this.myData.filter((i) => !i.deleted);
+        return this.myData.filter((i) => !i.deleted)
       }
     },
-    items() {
-      let items;
+    items () {
+      let items
       if (this.currentItem) {
         items = this.shownData().filter(
           (i) => i.parentId === this.currentItem.id
-        );
+        )
       } else {
-        items = this.shownData().filter((i) => !i.parentId);
+        items = this.shownData().filter((i) => !i.parentId)
       }
-      return items;
+      return items
     },
-    selectedIndex() {
-      return this.items().indexOf(this.selectedItem);
+    selectedIndex () {
+      return this.items().indexOf(this.selectedItem)
     },
-    calculatedValue(parentItem) {
-      let calcValue = 0.0;
-      let multiplierUnit = null;
-      let multiplier1 = 1;
-      let multiplier2 = 1;
-      let divisorUnit = null;
-      let divisor = 1;
-      let percent = 100;
-      if (parentItem.unit && parentItem.unit.includes("/")) {
+    calculatedValue (parentItem) {
+      let calcValue = 0.0
+      let multiplierUnit = null
+      let multiplier1 = 1
+      let multiplier2 = 1
+      let divisorUnit = null
+      let divisor = 1
+      let percent = 100
+      if (parentItem.unit && parentItem.unit.includes('/')) {
         // wenn Einheit z.B. Eur/st
-        multiplierUnit = this.getUnitByName(parentItem.unit.split("/")[0]);
-        divisorUnit = this.getUnitByName(parentItem.unit.split("/")[1]);
+        multiplierUnit = this.getUnitByName(parentItem.unit.split('/')[0])
+        divisorUnit = this.getUnitByName(parentItem.unit.split('/')[1])
       }
 
-      let items = this.shownData().filter((i) => i.parentId === parentItem.id);
+      const items = this.shownData().filter(
+        (i) => i.parentId === parentItem.id
+      )
 
       if (items.length > 1) {
         if (
@@ -347,315 +355,325 @@ export default {
         ) {
           items.forEach(
             (i) => (calcValue += parseFloat(this.calculatedValue(i)))
-          );
+          )
         } else {
           if (parentItem.unit) {
             items.forEach((item) => {
               if (item.linkId) {
-                item = this.getItemById(item.linkId);
+                item = this.getItemById(item.linkId)
               }
-              let unit = this.getUnitByName(item.unit);
-              if (unit.name.includes("%")) {
-                if (unit.name.includes("Aufschlag")) {
-                  percent = eval(item.value) + 100;
+              const unit = this.getUnitByName(item.unit)
+              if (unit.name.includes('%')) {
+                if (unit.name.includes('Aufschlag')) {
+                  // eslint-disable-next-line no-eval
+                  percent = eval(item.value) + 100
                 } else {
-                  percent = item.value;
+                  percent = item.value
                 }
               } else {
-                let value = eval(this.calculatedValue(item));
-                if (parentItem.unit && parentItem.unit.includes("/")) {
-                  if (unit.base.split("/")[0] === multiplierUnit.base) {
-                    multiplier1 = value * unit.value;
+                // eslint-disable-next-line no-eval
+                const value = eval(this.calculatedValue(item))
+                if (parentItem.unit && parentItem.unit.includes('/')) {
+                  if (unit.base.split('/')[0] === multiplierUnit.base) {
+                    multiplier1 = value * unit.value
                   }
-                  if (unit.base.split("/")[0] === divisorUnit.base) {
-                    divisor = value * unit.value;
+                  if (unit.base.split('/')[0] === divisorUnit.base) {
+                    divisor = value * unit.value
                   }
                 } else {
                   if (item.unit) {
-                    if (!item.unit.includes("/")) {
-                      multiplier1 = value * unit.value;
+                    if (!item.unit.includes('/')) {
+                      multiplier1 = value * unit.value
                     }
-                    if (item.unit.includes("/")) {
-                      multiplier2 = value * unit.value;
+                    if (item.unit.includes('/')) {
+                      multiplier2 = value * unit.value
                     }
                   }
                 }
               }
-            });
-            calcValue = (multiplier1 * multiplier2) / divisor;
+            })
+            calcValue = (multiplier1 * multiplier2) / divisor
             calcValue =
               (calcValue / this.getUnitByName(parentItem.unit).value) *
-              (percent / 100);
+              (percent / 100)
           }
         }
       }
       if (!calcValue) {
-        calcValue = parentItem.value;
+        calcValue = parentItem.value
       }
 
-      return calcValue;
+      return calcValue
     },
-    searchItem() {
+    searchItem () {
       if (this.searchText !== this.searchTextOld) {
-        this.searchIndex = 0;
+        this.searchIndex = 0
       }
-      let searchFilter = this.shownData().filter((i) => this.searchFound(i));
+      const searchFilter = this.shownData().filter((i) => this.searchFound(i))
       if (searchFilter) {
         if (this.searchIndex === searchFilter.length) {
-          this.searchIndex = 0;
-          alert("Ende erreicht.");
+          this.searchIndex = 0
+          alert('Ende erreicht.')
         }
-        this.currentItem = searchFilter[this.searchIndex];
+        this.currentItem = searchFilter[this.searchIndex]
       } else {
-        alert("Nicht gefunden.");
+        alert('Nicht gefunden.')
       }
-      this.searchIndex += 1;
-      this.searchTextOld = this.searchText;
+      this.searchIndex += 1
+      this.searchTextOld = this.searchText
     },
-    searchFound(item) {
-      let found = false;
-      this.searchText.split(" ").forEach((word) => {
+    searchFound (item) {
+      let found = false
+      this.searchText.split(' ').forEach((word) => {
         if (!found) {
           found =
-            item.name && item.name.toUpperCase().includes(word.toUpperCase());
+            item.name && item.name.toUpperCase().includes(word.toUpperCase())
         }
-      });
-      this.searchText.split(" ").forEach((word) => {
+      })
+      this.searchText.split(' ').forEach((word) => {
         if (found) {
           found = this.pathString(item)
             .toUpperCase()
-            .includes(word.toUpperCase());
+            .includes(word.toUpperCase())
         }
-      });
-      return found;
+      })
+      return found
     },
-    unitNames() {
-      return this.units().map((u) => u.name);
+    unitNames () {
+      return this.units().map((u) => u.name)
     },
-    pathArray(item) {
-      let array = [];
-      let count = 0;
+    pathArray (item) {
+      const array = []
+      let count = 0
       while (count < 10 && item && item.parentId) {
-        item = this.myData.find((i) => i.id === item.parentId);
+        item = this.myData.find((i) => i.id === item.parentId)
         if (item) {
-          array.unshift(item);
+          array.unshift(item)
         }
-        count += 1;
+        count += 1
       }
-      return array;
+      return array
     },
-    pathString(item) {
-      let path = "";
+    pathString (item) {
+      let path = ''
       this.pathArray(item).forEach((i) => {
-        if (path !== "") {
-          path += " > ";
+        if (path !== '') {
+          path += ' > '
         }
-        path += i.name;
-      });
-      path += this.isNull(item.name);
-      return path;
+        path += i.name
+      })
+      path += this.isNull(item.name)
+      return path
     },
-    childrenString(item) {
-      let children = "";
+    childrenString (item) {
+      let children = ''
       this.shownData()
         .filter((i) => i.parentId === item.id)
         .forEach((i) => {
-          if (children !== "") {
-            children += ", ";
+          if (children !== '') {
+            children += ', '
           }
           children += i.linkId
-            ? " -> " + this.getItemById(i.linkId).name
-            : this.isNull(i.name);
-        });
-      return children;
+            ? ' -> ' + this.getItemById(i.linkId).name
+            : this.isNull(i.name)
+        })
+      return children
     },
-    linkedItems() {
+    linkedItems () {
       if (this.currentItem) {
-        return this.myData.filter((i) => i.linkId === this.currentItem.id);
+        return this.myData.filter((i) => i.linkId === this.currentItem.id)
       } else {
-        return [];
+        return []
       }
     },
-    selectItem(item, fromList) {
+    selectItem (item, fromList) {
       if (!fromList || (this.selectedItem && this.selectedItem === item)) {
         if (this.currentItem) {
           if (
             this.currentItem !== this.navigateList[this.navigateList.length - 1]
           ) {
-            this.navigateList.push(this.currentItem);
+            this.navigateList.push(this.currentItem)
           }
         } else {
-          this.navigateList.push(null);
+          this.navigateList.push(null)
         }
         if (item && item.linkId && !item.name) {
-          this.currentItem = this.getItemById(item.linkId);
+          this.currentItem = this.getItemById(item.linkId)
         } else {
-          this.currentItem = item;
+          this.currentItem = item
         }
-        this.selectedItem = null;
+        this.selectedItem = null
       } else {
-        this.selectedItem = item;
+        this.selectedItem = item
       }
     },
-    getItemById(id) {
-      return this.myData.find((i) => i.id === id);
+    getItemById (id) {
+      return this.myData.find((i) => i.id === id)
     },
-    showItem(item) {
-      let value = this.isNull(this.calculatedValue(item));
+    showItem (item) {
+      let value = this.isNull(this.calculatedValue(item))
       if (this.isNumeric(this.calculatedValue(item))) {
         value = this.numberDe(
           Math.round(this.calculatedValue(item) * 1000) / 1000
-        );
+        )
       }
       return (
-        this.isNull(item.name) + " " + value + " " + this.isNull(item.unit)
-      );
+        this.isNull(item.name) + ' ' + value + ' ' + this.isNull(item.unit)
+      )
     },
-    goBack() {
+    goBack () {
       if (this.selectedItem || this.editedItem || this.cutedItem) {
-        this.editedItem = null;
-        this.selectedItem = null;
-        this.cutedItem = null;
+        this.editedItem = null
+        this.selectedItem = null
+        this.cutedItem = null
       } else {
-        let len = this.navigateList.length;
-        this.currentItem = this.navigateList[len - 1];
-        this.navigateList.splice(len - 1, 1);
+        const len = this.navigateList.length
+        this.currentItem = this.navigateList[len - 1]
+        this.navigateList.splice(len - 1, 1)
       }
     },
-    newItem() {
-      this.editedItem = {};
+    newItem () {
+      this.editedItem = {}
       if (this.currentItem) {
-        let children = this.myData.filter(
+        const children = this.myData.filter(
           (i) => i.parentId === this.currentItem.id
-        );
+        )
         if (this.currentItem) {
-          this.editedItem.parentId = this.currentItem.id;
+          this.editedItem.parentId = this.currentItem.id
         }
-        if (this.currentItem.unit.includes("/")) {
+        if (this.currentItem.unit.includes('/')) {
           if (children.length === 0) {
-            this.editedItem.unit = this.currentItem.unit.split("/")[0];
+            this.editedItem.unit = this.currentItem.unit.split('/')[0]
           } else {
-            this.editedItem.unit = this.currentItem.unit.split("/")[1];
+            this.editedItem.unit = this.currentItem.unit.split('/')[1]
             if (this.units().find((u) => u.singular === this.editedItem.unit)) {
               this.editedItem.unit = this.units().find(
                 (u) => u.singular === this.editedItem.unit
-              ).name;
+              ).name
             }
           }
         } else {
           if (
             children.length > 0 &&
             children[0].unit &&
-            children[0].unit.includes("/")
+            children[0].unit.includes('/')
           ) {
             // Wenn die erste Einheit z.B. "Eur/St" ist, dann als nächstes "St" vorschlagen
-            this.editedItem.unit = children[0].unit.split("/")[1];
+            this.editedItem.unit = children[0].unit.split('/')[1]
           } else {
             if (this.currentItem.unit) {
-              this.editedItem.unit = this.currentItem.unit;
+              this.editedItem.unit = this.currentItem.unit
             }
           }
         }
       }
     },
-    modifyItem() {
-      this.editedItem = { ...this.selectedItem };
+    modifyItem () {
+      this.editedItem = { ...this.selectedItem }
     },
-    moveItem(step) {
-      let item = this.selectedItem;
-      let index = this.myData.indexOf(item);
-      let nextItem = this.items()[this.selectedIndex() + step];
-      this.myData.splice(index, 1);
-      let nextIndex = this.myData.indexOf(nextItem);
-      let endArray = this.myData.slice(nextIndex + (step === -1 ? 0 : 1));
-      this.myData = this.myData.slice(0, nextIndex + (step === -1 ? 0 : 1));
-      this.myData.push(item);
-      this.myData = this.myData.concat(endArray);
-      this.calculateAndStore();
+    moveItem (step) {
+      const item = this.selectedItem
+      const index = this.myData.indexOf(item)
+      const nextItem = this.items()[this.selectedIndex() + step]
+      this.myData.splice(index, 1)
+      const nextIndex = this.myData.indexOf(nextItem)
+      const endArray = this.myData.slice(nextIndex + (step === -1 ? 0 : 1))
+      this.myData = this.myData.slice(0, nextIndex + (step === -1 ? 0 : 1))
+      this.myData.push(item)
+      this.myData = this.myData.concat(endArray)
+      this.calculateAndStore()
     },
-    cutItem() {
-      this.cutedItem = { ...this.selectedItem };
-      this.myData.splice(this.myData.indexOf(this.selectedItem), 1);
+    cutItem () {
+      this.cutedItem = { ...this.selectedItem }
+      this.myData.splice(this.myData.indexOf(this.selectedItem), 1)
     },
-    copyItem() {
-      this.copiedItem = { ...this.selectedItem };
+    copyItem () {
+      this.copiedItem = { ...this.selectedItem }
     },
-    deleteItem() {
+    deleteItem () {
       if (!this.selectedItem.deleted) {
-        this.selectedItem.deleted = true;
+        this.selectedItem.deleted = true
       } else {
-        this.myData.splice(this.myData.indexOf(this.selectedItem), 1);
+        this.myData.splice(this.myData.indexOf(this.selectedItem), 1)
       }
-      this.calculateAndStore();
-      this.selectedItem = null;
+      this.calculateAndStore()
+      this.selectedItem = null
     },
-    restoreItem() {
-      this.selectedItem.deleted = false;
-      this.calculateAndStore();
-      this.selectedItem = null;
+    restoreItem () {
+      this.selectedItem.deleted = false
+      this.calculateAndStore()
+      this.selectedItem = null
     },
-    pasteItem() {
-      let item;
+    pasteItem () {
+      let item
       if (this.cutedItem) {
-        item = this.cutedItem;
+        item = this.cutedItem
       } else {
-        item = this.copiedItem;
+        item = this.copiedItem
       }
       if (this.currentItem) {
-        item.parentId = this.currentItem.id;
+        item.parentId = this.currentItem.id
       } else {
-        item.parentId = null;
+        item.parentId = null
       }
       if (this.cutedItem) {
-        this.cutedItem.modified = new Date();
-        this.myData.push(this.cutedItem);
-        this.cutedItem = null;
+        this.cutedItem.modified = new Date()
+        this.myData.push(this.cutedItem)
+        this.cutedItem = null
       } else {
-        pasteCopiedItem(this.copiedItem, this.myData);
-        this.copiedItem = null;
+        pasteCopiedItem(this.copiedItem, this.myData)
+        this.copiedItem = null
       }
 
-      this.calculateAndStore();
+      this.calculateAndStore()
 
-      function pasteCopiedItem(item, data) {
-        let oldId = item.id;
-        item.id = new Date();
+      function pasteCopiedItem (item, data) {
+        const oldId = item.id
+        item.id = new Date()
         if (item.modified) {
-          delete item.modified;
+          delete item.modified
         }
-        data.push(item);
-        let items = data.filter((i) => i.parentId === oldId);
+        data.push(item)
+        const items = data.filter((i) => i.parentId === oldId)
         items.forEach((i) => {
-          let child = { ...i };
-          child.parentId = item.id;
-          pasteCopiedItem(child, data);
-        });
+          const child = { ...i }
+          child.parentId = item.id
+          pasteCopiedItem(child, data)
+        })
       }
     },
-    save() {
-      this.editedItem.value = this.numberUs(this.editedItem.value);
-      if (!this.editedItem.id) {
-        this.editedItem.id = new Date();
-        this.myData.push(this.editedItem);
-      } else {
-        //this.currentItem = {...this.editedItem}
-        let item = this.myData.find((i) => i.id === this.editedItem.id);
+    save () {
+      db.collection('data').add(this.editedItem)
+        .then(function (docRef) {
+          console.log('Document written with ID: ', docRef.id)
+        })
+        .catch(function (error) {
+          console.error('Error adding document: ', error)
+        })
 
-        item.parentId = this.editedItem.parentId;
-        item.linkId = this.editedItem.linkId;
-        item.name = this.editedItem.name;
-        item.value = this.editedItem.value;
-        item.unit = this.editedItem.unit;
-        item.modified = new Date();
+      this.editedItem.value = this.numberUs(this.editedItem.value)
+      if (!this.editedItem.id) {
+        this.editedItem.id = new Date()
+        this.myData.push(this.editedItem)
+      } else {
+        // this.currentItem = {...this.editedItem}
+        const item = this.myData.find((i) => i.id === this.editedItem.id)
+
+        item.parentId = this.editedItem.parentId
+        item.linkId = this.editedItem.linkId
+        item.name = this.editedItem.name
+        item.value = this.editedItem.value
+        item.unit = this.editedItem.unit
+        item.modified = new Date()
       }
 
       // this.calculateForParent(this.editedItem);
       // Alle neu kalkulieren
-      this.calculateAndStore();
+      this.calculateAndStore()
 
-      this.editedItem = null;
-      this.cutedItem = null;
-      this.copiedItem = null;
+      this.editedItem = null
+      this.cutedItem = null
+      this.copiedItem = null
     },
     /*
     calculateForParent(item) {
@@ -736,8 +754,8 @@ export default {
         item = parentItem;
         count += 1;
       }
-    },*/
-    calculateAndStore() {
+    }, */
+    calculateAndStore () {
       /*
       this.myData.forEach((item) => {
         if (item.unit === "%") {
@@ -746,148 +764,149 @@ export default {
       });
       this.myData.forEach((item) => {
         this.calculateForParent(item);
-      });*/
-      localStorage.setItem("racalc-data", JSON.stringify(this.myData));
+      }); */
+      localStorage.setItem('racalc-data', JSON.stringify(this.myData))
     },
-    download() {
+    download () {
       // credit: https://www.bitdegree.org/learn/javascript-download
-      let text;
-      let filename;
+      let text
+      let filename
       if (this.currentItem) {
-        let data = [];
-        data.push(this.currentItem);
-        let item = this.currentItem;
-        let count = 0;
+        const data = []
+        data.push(this.currentItem)
+        let item = this.currentItem
+        let count = 0
         while (count < 10 && item.parentId) {
-          item = this.myData.find((i) => i.id === item.parentId);
-          data.push(item);
-          count += 1;
+          item = this.myData.find((i) => i.id === item.parentId)
+          data.push(item)
+          count += 1
         }
-        this.addChildrenToData(data, item);
-        text = JSON.stringify(data);
-        filename = "racalc-" + this.currentItem.name + ".json";
+        this.addChildrenToData(data, item)
+        text = JSON.stringify(data)
+        filename = 'racalc-' + this.currentItem.name + '.json'
       } else {
-        text = JSON.stringify(this.myData);
-        filename = "racalc.json";
+        text = JSON.stringify(this.myData)
+        filename = 'racalc.json'
       }
-      let element = document.createElement("a");
+      const element = document.createElement('a')
       element.setAttribute(
-        "href",
-        "data:application/json;charset=utf-8," + encodeURIComponent(text)
-      );
-      element.setAttribute("download", filename);
+        'href',
+        'data:application/json;charset=utf-8,' + encodeURIComponent(text)
+      )
+      element.setAttribute('download', filename)
 
-      element.style.display = "none";
-      document.body.appendChild(element);
+      element.style.display = 'none'
+      document.body.appendChild(element)
 
-      element.click();
-      document.body.removeChild(element);
+      element.click()
+      document.body.removeChild(element)
     },
-    addChildrenToData(data, item) {
+    addChildrenToData (data, item) {
       this.myData
         .filter((i) => i.parentId === item.id)
         .forEach((child) => {
-          data.push(child);
-          this.addChildrenToData(data, child);
-        });
+          data.push(child)
+          this.addChildrenToData(data, child)
+        })
     },
-    onPickFile() {
-      this.$refs.fileInput.click();
+    onPickFile () {
+      this.$refs.fileInput.click()
     },
     // Upload
-    onFilePicked(event) {
-      this.download(); // vorher sichern
-      const files = event.target.files;
-      //let filename = files[0].name;
-      const fileReader = new FileReader();
-      fileReader.addEventListener("load", () => {
-        this.imageUrl = fileReader.result;
-      });
-      fileReader.readAsText(files[0]);
-      let thisHelp = this;
-      fileReader.onload = function() {
-        let uploadData = JSON.parse(fileReader.result);
+    onFilePicked (event) {
+      this.download() // vorher sichern
+      const files = event.target.files
+      // let filename = files[0].name;
+      const fileReader = new FileReader()
+      fileReader.addEventListener('load', () => {
+        this.imageUrl = fileReader.result
+      })
+      fileReader.readAsText(files[0])
+      const thisHelp = this
+      fileReader.onload = function () {
+        const uploadData = JSON.parse(fileReader.result)
         uploadData.forEach((item) => {
-          let foundItem = thisHelp.myData.find((i) => i.id === item.id);
+          let foundItem = thisHelp.myData.find((i) => i.id === item.id)
           if (!foundItem) {
-            thisHelp.myData.push(item);
+            thisHelp.myData.push(item)
           } else {
             if (
               foundItem.modified &&
               (!item.modified ||
                 new Date(foundItem.modified) > new Date(item.modified))
             ) {
-              foundItem = { ...item };
+              foundItem = { ...item }
             }
           }
-          localStorage.setItem("racalc-data", JSON.stringify(thisHelp.myData));
-          window.location.reload();
-        });
-      };
+          localStorage.setItem('racalc-data', JSON.stringify(thisHelp.myData))
+          window.location.reload()
+        })
+      }
     },
-    getUnitByName(unitName) {
-      let unit = null;
+    getUnitByName (unitName) {
+      let unit = null
       if (unitName) {
-        unit = { name: unitName, base: null, value: 1 };
-        unitName.split("/").forEach((name) => {
-          let oneUnit = this.units().find((u) => u.name === name);
+        unit = { name: unitName, base: null, value: 1 }
+        unitName.split('/').forEach((name) => {
+          let oneUnit = this.units().find((u) => u.name === name)
           if (!oneUnit) {
-            oneUnit = this.units().find((u) => u.singular === name);
+            oneUnit = this.units().find((u) => u.singular === name)
           }
           if (!unit.base) {
             if (oneUnit.base) {
-              unit.base = oneUnit.base;
-              unit.value = oneUnit.value;
+              unit.base = oneUnit.base
+              unit.value = oneUnit.value
             } else {
-              unit.base = name;
+              unit.base = name
             }
           } else {
             if (oneUnit.base) {
-              unit.base += "/" + oneUnit.base;
-              unit.value = unit.value / oneUnit.value;
+              unit.base += '/' + oneUnit.base
+              unit.value = unit.value / oneUnit.value
             } else {
-              unit.base += "/" + name;
+              unit.base += '/' + name
             }
           }
-        });
+        })
       }
-      return unit;
+      return unit
     },
-    isNull(str) {
+    isNull (str) {
       if (str) {
-        return str;
+        return str
       } else {
-        return "";
+        return ''
       }
     },
-    resultEval(str) {
+    resultEval (str) {
       if (str) {
         try {
-          return eval(str);
+          // eslint-disable-next-line no-eval
+          return eval(str)
         } catch (error) {
-          return str;
+          return str
         }
       } else {
-        return "";
+        return ''
       }
     },
-    numberDe(value) {
+    numberDe (value) {
       if (value) {
-        return value.toString().replaceAll(".", ",");
+        return value.toString().replaceAll('.', ',')
       } else {
-        return "";
+        return ''
       }
     },
-    numberUs(value) {
+    numberUs (value) {
       if (value) {
-        return value.toString().replaceAll(",", ".");
+        return value.toString().replaceAll(',', '.')
       } else {
-        return "";
+        return ''
       }
     },
-    isNumeric(value) {
-      return !isNaN(parseFloat(value)) && isFinite(value);
-    },
-  },
-};
+    isNumeric (value) {
+      return !isNaN(parseFloat(value)) && isFinite(value)
+    }
+  }
+}
 </script>
