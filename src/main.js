@@ -3,19 +3,18 @@ import App from './App.vue'
 import vuetify from './plugins/vuetify'
 import './registerServiceWorker'
 import router from './router'
-import firebase from 'firebase'
+import firebase from 'firebase/app'
 
 Vue.config.productionTip = false
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyDbjR08ak2G383-RtlazHzuOeTRgAkfN30',
-  authDomain: 'notesandmore-943e9.firebaseapp.com',
-  databaseURL: 'https://notesandmore-943e9.firebaseio.com',
-  projectId: 'notesandmore-943e9',
-  storageBucket: 'notesandmore-943e9.appspot.com',
-  messagingSenderId: '142919885745',
-  appId: '1:142919885745:web:32bc64c6e3f8f8ed625390',
-  measurementId: 'G-7FLGBDCE7V'
+  apiKey: 'AIzaSyC_Tq0r4xJlJIxpomh-aScKezWoK1g99zY',
+  authDomain: 'myinfo24.firebaseapp.com',
+  projectId: 'myinfo24',
+  storageBucket: 'myinfo24.appspot.com',
+  messagingSenderId: '747886337818',
+  appId: '1:747886337818:web:4ad165a3a7a476bd01d6a3',
+  measurementId: 'G-NHHGMHZ7B6'
 }
 firebase.initializeApp(firebaseConfig)
 

@@ -4,7 +4,7 @@
   <v-app>
     <v-app-bar app color="primary" dark>
       <v-btn
-        :disabled="navigateList.length === 0 && !selectedItem"
+        :disabled="navigateList.length === 0 && !selectedItem  && !editedItem"
         text
         small
         @click="goBack"
@@ -97,7 +97,7 @@
       style="display: none"
       ref="fileInput"
       accept="*.json"
-      @change="onFilePicked"
+      @change="getUploadetData"
     />
 
     <v-main class="ma-8">
@@ -201,6 +201,10 @@
               item-text="name"
               label="Verknüpfung"
             ></v-autocomplete>
+            <v-checkbox
+              v-model="editedItem.toCloud"
+              label="In Cloud speichern"
+            ></v-checkbox>
           </form>
         </v-list>
 
@@ -224,6 +228,7 @@
 </template>
 
 <script>
+import firebase from 'firebase'
 
 export default {
   name: 'App',
@@ -293,20 +298,46 @@ export default {
     }
   },
   mounted () {
-    if (localStorage.getItem('racalc-data') !== null) {
-      this.myData = JSON.parse(localStorage.getItem('racalc-data'))
+    if (localStorage.getItem('myinfo24-data') !== null) {
+      this.myData = JSON.parse(localStorage.getItem('myinfo24-data'))
       this.myData = this.myData.filter((i) => !(i === null)) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
     } else {
       this.myData = []
     }
     // this.$refs.inputName.focus()
 
-    this.$firestore.data.add({
-      firstname: 'Amrani',
-      lastname: 'Houssain'
-    })
+    this.getFromFirestore()
   },
   methods: {
+    async getFromFirestore () {
+      var dataRef = await firebase
+        .firestore()
+        .collection('data')
+
+      dataRef.onSnapshot(snap => {
+        const items = []
+        snap.forEach(doc => {
+          const item = doc.data()
+          item.id = doc.id
+          items.push(item)
+        })
+        this.myData.forEach(item => {
+          const cloudItem = items.find(i => item.id === i.id)
+          if (item) {
+            this.itemsToMyData(items, cloudItem)
+          }
+        })
+      })
+    },
+    itemsToMyData (items, item) {
+      item.toCloud = true
+      this.setItemToData(this.myData, item)
+      this.myData
+        .filter((i) => i.parentId === item.id)
+        .forEach((child) => {
+          this.itemsToMyData(items, child)
+        })
+    },
     shownData () {
       if (this.withDeletedItems) {
         return this.myData
@@ -580,7 +611,7 @@ export default {
       this.myData = this.myData.slice(0, nextIndex + (step === -1 ? 0 : 1))
       this.myData.push(item)
       this.myData = this.myData.concat(endArray)
-      this.calculateAndStore()
+      this.storeData()
     },
     cutItem () {
       this.cutedItem = { ...this.selectedItem }
@@ -595,12 +626,12 @@ export default {
       } else {
         this.myData.splice(this.myData.indexOf(this.selectedItem), 1)
       }
-      this.calculateAndStore()
+      this.storeData()
       this.selectedItem = null
     },
     restoreItem () {
       this.selectedItem.deleted = false
-      this.calculateAndStore()
+      this.storeData()
       this.selectedItem = null
     },
     pasteItem () {
@@ -624,7 +655,7 @@ export default {
         this.copiedItem = null
       }
 
-      this.calculateAndStore()
+      this.storeData()
 
       function pasteCopiedItem (item, data) {
         const oldId = item.id
@@ -643,11 +674,11 @@ export default {
     },
     save () {
       this.editedItem.value = this.numberUs(this.editedItem.value)
+      this.editedItem.timeStamp = new Date()
       if (!this.editedItem.id) {
-        this.editedItem.id = new Date()
+        this.editedItem.id = createUUID()
         this.myData.push(this.editedItem)
       } else {
-        // this.currentItem = {...this.editedItem}
         const item = this.myData.find((i) => i.id === this.editedItem.id)
 
         item.parentId = this.editedItem.parentId
@@ -658,9 +689,22 @@ export default {
         item.modified = new Date()
       }
 
-      // this.calculateForParent(this.editedItem);
-      // Alle neu kalkulieren
-      this.calculateAndStore()
+      if (this.editedItem.toCloud) {
+        const cloudItem = { ...this.editedItem }
+        delete cloudItem.toCloud
+        delete cloudItem.id
+
+        firebase
+          .firestore()
+          .collection('data')
+          .doc(this.editedItem.id)
+          .set(cloudItem)
+          .then((ref) => {
+            console.log('Added doc with ID: ', ref.id)
+          })
+      }
+
+      this.storeData()
 
       this.editedItem = null
       this.cutedItem = null
@@ -746,7 +790,7 @@ export default {
         count += 1;
       }
     }, */
-    calculateAndStore () {
+    storeData () {
       /*
       this.myData.forEach((item) => {
         if (item.unit === "%") {
@@ -756,7 +800,7 @@ export default {
       this.myData.forEach((item) => {
         this.calculateForParent(item);
       }); */
-      localStorage.setItem('racalc-data', JSON.stringify(this.myData))
+      localStorage.setItem('myinfo24-data', JSON.stringify(this.myData))
     },
     download () {
       // credit: https://www.bitdegree.org/learn/javascript-download
@@ -774,10 +818,10 @@ export default {
         }
         this.addChildrenToData(data, item)
         text = JSON.stringify(data)
-        filename = 'racalc-' + this.currentItem.name + '.json'
+        filename = 'myinfo24-' + this.currentItem.name + '.json'
       } else {
         text = JSON.stringify(this.myData)
-        filename = 'racalc.json'
+        filename = 'myinfo24.json'
       }
       const element = document.createElement('a')
       element.setAttribute(
@@ -803,8 +847,7 @@ export default {
     onPickFile () {
       this.$refs.fileInput.click()
     },
-    // Upload
-    onFilePicked (event) {
+    getUploadetData (event) {
       this.download() // vorher sichern
       const files = event.target.files
       // let filename = files[0].name;
@@ -817,21 +860,21 @@ export default {
       fileReader.onload = function () {
         const uploadData = JSON.parse(fileReader.result)
         uploadData.forEach((item) => {
-          let foundItem = thisHelp.myData.find((i) => i.id === item.id)
-          if (!foundItem) {
-            thisHelp.myData.push(item)
-          } else {
-            if (
-              foundItem.modified &&
-              (!item.modified ||
-                new Date(foundItem.modified) > new Date(item.modified))
-            ) {
-              foundItem = { ...item }
-            }
-          }
-          localStorage.setItem('racalc-data', JSON.stringify(thisHelp.myData))
+          this.abortsetItemToData(thisHelp.myData, item)
+
+          localStorage.setItem('myinfo24-data', JSON.stringify(thisHelp.myData))
           window.location.reload()
         })
+      }
+    },
+    setItemToData (data, item) {
+      let foundItem = data.find((i) => i.id === item.id)
+      if (!foundItem) {
+        data.push(item)
+      } else {
+        if (foundItem.modified && (!item.modified || new Date(foundItem.modified) > new Date(item.modified))) {
+          foundItem = { ...item }
+        }
       }
     },
     getUnitByName (unitName) {
@@ -900,4 +943,12 @@ export default {
     }
   }
 }
+
+function createUUID () {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0; var v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 </script>
