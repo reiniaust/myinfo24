@@ -89,7 +89,10 @@
             <v-list-item-title>Daten-Upload</v-list-item-title>
           </v-list-item>
           <v-list-item v-if="currentItem" text small>
-            <v-list-item-title>{{ currentItem.id }}</v-list-item-title>
+            <v-list-item-title>{{ 'id: ' + currentItem.id }}</v-list-item-title>
+          </v-list-item>
+          <v-list-item text small>
+            <v-list-item-title>App-Version 1.0.8</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
@@ -235,7 +238,7 @@ export default {
   name: 'App',
 
   data: () => ({
-    myData: null,
+    myData: [],
     cloudItems: null,
     // items: null,
     withDeletedItems: false,
@@ -333,7 +336,7 @@ export default {
     },
     itemTreeToMyData (item) {
       item.toCloud = true
-      this.setItemToData(this.myData, item)
+      this.setItemToMyData(item)
       this.myData
         .filter((i) => i.parentId === item.id)
         .forEach((child) => {
@@ -438,11 +441,12 @@ export default {
       return calcValue
     },
     searchItem () {
-      if (this.searchText.substring(13, 15) === '-4') {
-        const cloudItem = this.cloudItems.find(i => this.searchText === i.id)
+      if (this.searchText.substring(0, 3) === 'id:') {
+        const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === i.id)
         if (cloudItem) {
           this.searchText = ''
           this.itemTreeToMyData(cloudItem)
+          this.storeData()
         }
       } else {
         if (this.searchText !== this.searchTextOld) {
@@ -688,12 +692,15 @@ export default {
       } else {
         const item = this.myData.find((i) => i.id === this.editedItem.id)
 
+        Object.assign(item, this.editedItem)
+        /*
         item.parentId = this.editedItem.parentId
         item.linkId = this.editedItem.linkId
         item.name = this.editedItem.name
         item.value = this.editedItem.value
         item.unit = this.editedItem.unit
         item.timeStamp = this.editedItem.timeStamp
+        */
       }
 
       if (this.editedItem.toCloud) {
@@ -867,20 +874,20 @@ export default {
       fileReader.onload = function () {
         const uploadData = JSON.parse(fileReader.result)
         uploadData.forEach((item) => {
-          thisHelp.setItemToData(thisHelp.myData, item)
+          thisHelp.setItemToMyData(item)
 
           localStorage.setItem('myinfo24-data', JSON.stringify(thisHelp.myData))
           window.location.reload()
         })
       }
     },
-    setItemToData (data, item) {
-      let foundItem = data.find((i) => i.id === item.id)
+    setItemToMyData (item) {
+      const foundItem = this.myData.find((i) => i.id === item.id)
       if (!foundItem) {
-        data.push(item)
+        this.myData.push(item)
       } else {
         // if (foundItem.modified && (!item.modified || new Date(foundItem.modified) > new Date(item.modified))) {
-        foundItem = { ...item }
+        Object.assign(foundItem, item)
         // }
       }
     },
