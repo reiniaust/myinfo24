@@ -2,6 +2,10 @@
 /* eslint-disable no-eval */
 <template>
   <v-app>
+    <v-snackbar bottom right :value="updateExists" :timeout="0" color="primary">
+      Es ist ein Update verfügbar
+      <v-btn text @click="refreshApp">Update</v-btn>
+    </v-snackbar>
     <v-app-bar app color="primary" dark>
       <v-btn
         :disabled="navigateList.length === 0 && !selectedItem  && !editedItem"
@@ -16,20 +20,10 @@
       </v-btn>
       <div v-if="!editedItem && !cutedItem && !copiedItem">
         <div v-if="selectedItem">
-          <v-btn
-            :disabled="selectedIndex() === 0"
-            text
-            small
-            @click="moveItem(-1)"
-          >
+          <v-btn :disabled="selectedIndex() === 0" text small @click="moveItem(-1)">
             <v-icon>mdi-arrow-up</v-icon>
           </v-btn>
-          <v-btn
-            :disabled="selectedIndex() + 1 === items().length"
-            text
-            small
-            @click="moveItem(1)"
-          >
+          <v-btn :disabled="selectedIndex() + 1 === items().length" text small @click="moveItem(1)">
             <v-icon>mdi-arrow-down</v-icon>
           </v-btn>
           <!-- Ändern -->
@@ -65,18 +59,10 @@
           </v-btn>
         </template>
         <v-list>
-          <v-list-item
-            v-if="!withDeletedItems"
-            @click="withDeletedItems = true"
-          >
-            <v-list-item-title
-              >Gelöschte Einträge mit anzeigen</v-list-item-title
-            >
+          <v-list-item v-if="!withDeletedItems" @click="withDeletedItems = true">
+            <v-list-item-title>Gelöschte Einträge mit anzeigen</v-list-item-title>
           </v-list-item>
-          <v-list-item
-            v-if="withDeletedItems"
-            @click="withDeletedItems = false"
-          >
+          <v-list-item v-if="withDeletedItems" @click="withDeletedItems = false">
             <v-list-item-title>Ohne gelöschte Einträge</v-list-item-title>
           </v-list-item>
           <v-list-item v-if="selectedItem" @click="copyItem">
@@ -115,11 +101,7 @@
           </v-btn>
         </v-row>
         <v-row v-if="!editedItem">
-          <v-text-field
-            ref="inputName"
-            v-model="newItemName"
-            label="Neuer Eintrag">
-            </v-text-field>
+          <v-text-field ref="inputName" v-model="newItemName" label="Neuer Eintrag"></v-text-field>
           <v-btn v-if="newItemName !== ''" text @click="saveNewItemName">
             <v-icon>mdi-content-save</v-icon>
           </v-btn>
@@ -132,32 +114,27 @@
             v-for="item in pathArray(currentItem)"
             :key="item.id"
             @click="selectItem(item)"
-          >
-            {{ item.name + " >" }}
-          </div>
+          >{{ item.name + " >" }}</div>
         </v-row>
 
         <v-list>
           <div v-if="!(editedItem && editedItem.id)" class="mb-2">
-            <h3>
-              {{ currentItem ? showItem(currentItem) : "Home" }}
-            </h3>
+            <h3>{{ currentItem ? showItem(currentItem) : "Home" }}</h3>
             <v-list-item-subtitle
               v-if="currentItem && currentItem.linkId"
               @click="selectItem(getItemById(currentItem.linkId))"
-              >{{
-                "Verknüpfung: " +
-                pathString(getItemById(currentItem.linkId)) +
-                showItem(getItemById(currentItem.linkId))
-              }}</v-list-item-subtitle
             >
+              {{
+              "Verknüpfung: " +
+              pathString(getItemById(currentItem.linkId)) +
+              showItem(getItemById(currentItem.linkId))
+              }}
+            </v-list-item-subtitle>
           </div>
 
           <div v-if="!editedItem">
             <v-list-item v-for="(item, i) in items()" :key="i">
-              <v-list-item-content
-                :class="item === selectedItem ? 'font-weight-bold' : ''"
-              >
+              <v-list-item-content :class="item === selectedItem ? 'font-weight-bold' : ''">
                 <v-list-item-title
                   :class="item.deleted ? 'text-decoration-line-through' : ''"
                   v-text="
@@ -178,26 +155,15 @@
                 <v-list-item-subtitle
                   v-if="childrenString(item) !== ''"
                   @click="selectItem(item)"
-                  >{{ childrenString(item) }}
-                </v-list-item-subtitle>
+                >{{ childrenString(item) }}</v-list-item-subtitle>
               </v-list-item-content>
             </v-list-item>
           </div>
 
           <form v-if="editedItem" class="mt-4">
-            <v-text-field
-              v-model="editedItem.name"
-              label="Bezeichnung"
-            ></v-text-field>
-            <v-text-field
-              v-model="numberEdit"
-              label="Zahl oder Formel"
-            ></v-text-field>
-            <v-autocomplete
-              v-model="editedItem.unit"
-              :items="unitNames()"
-              label="Einheit"
-            ></v-autocomplete>
+            <v-text-field v-model="editedItem.name" label="Bezeichnung"></v-text-field>
+            <v-text-field v-model="numberEdit" label="Zahl oder Formel"></v-text-field>
+            <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
             <v-autocomplete
               v-model="editedItem.linkId"
               :items="
@@ -209,24 +175,19 @@
               item-text="name"
               label="Verknüpfung"
             ></v-autocomplete>
-            <v-checkbox
-              v-model="editedItem.toCloud"
-              label="In Cloud speichern"
-            ></v-checkbox>
+            <v-checkbox v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
           </form>
         </v-list>
 
         <v-list v-if="linkedItems().length > 0">
-          <v-list-item-subtitle> Verwendungen </v-list-item-subtitle>
+          <v-list-item-subtitle>Verwendungen</v-list-item-subtitle>
           <v-list-item
             v-for="(useItem, i) in linkedItems()"
             :key="i"
             @click="selectItem(getItemById(useItem.id))"
           >
             <v-list-item-content>
-              <v-list-item-title
-                v-text="pathString(useItem)"
-              ></v-list-item-title>
+              <v-list-item-title v-text="pathString(useItem)"></v-list-item-title>
             </v-list-item-content>
           </v-list-item>
         </v-list>
@@ -242,6 +203,8 @@ export default {
   name: 'App',
 
   data: () => ({
+    registration: null,
+    updateExists: false,
     myData: [],
     cloudItems: null,
     // items: null,
@@ -307,6 +270,16 @@ export default {
       }
     }
   },
+  created () {
+    document.addEventListener('swUpdated', this.updateAvailable, { once: true })
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // We'll also need to add 'refreshing' to our data originally set to false.
+      if (this.refreshing) return
+      this.refreshing = true
+      // Here the actual reload of the page occurs
+      window.location.reload()
+    })
+  },
   mounted () {
     if (localStorage.getItem('myinfo24-data') !== null) {
       this.myData = JSON.parse(localStorage.getItem('myinfo24-data'))
@@ -318,6 +291,17 @@ export default {
     this.getFromFirestore()
   },
   methods: {
+    updateAvailable (event) {
+      this.registration = event.detail
+      this.updateExists = true
+    },
+    refreshApp () {
+      this.updateExists = false
+      // Make sure we only send a 'skip waiting' message if the SW is waiting
+      if (!this.registration || !this.registration.waiting) return
+      // Send message to SW to skip the waiting and activate the new SW
+      this.registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+    },
     async getFromFirestore () {
       var dataRef = await firebase
         .firestore()
