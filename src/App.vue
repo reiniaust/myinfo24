@@ -11,7 +11,7 @@
       >
         <v-icon>mdi-arrow-left</v-icon>
       </v-btn>
-      <v-btn v-if="!editedItem && !selectedItem" text small @click="newItem">
+      <v-btn v-if="!editedItem && !selectedItem" text small @click="setNewItem">
         <v-icon>mdi-plus</v-icon>
       </v-btn>
       <div v-if="!editedItem && !cutedItem && !copiedItem">
@@ -49,7 +49,7 @@
           </v-btn>
         </div>
       </div>
-      <v-btn v-if="editedItem" text small @click="save">
+      <v-btn v-if="editedItem" text small @click="save(editedItem)">
         <v-icon>mdi-content-save</v-icon>
       </v-btn>
       <!-- Einfügen -->
@@ -114,6 +114,16 @@
             <v-icon>mdi-arrow-right</v-icon>
           </v-btn>
         </v-row>
+        <v-row v-if="!editedItem">
+          <v-text-field
+            ref="inputName"
+            v-model="newItemName"
+            label="Neuer Eintrag">
+            </v-text-field>
+          <v-btn v-if="newItemName !== ''" text @click="saveNewItemName">
+            <v-icon>mdi-content-save</v-icon>
+          </v-btn>
+        </v-row>
 
         <v-row class="mb-2" v-if="currentItem">
           <div class="mr-1" @click="selectItem(null)">Home ></div>
@@ -132,11 +142,6 @@
             <h3>
               {{ currentItem ? showItem(currentItem) : "Home" }}
             </h3>
-            <v-list-item-subtitle v-if="currentItem">{{
-              (currentItem.timeStamp
-                ? new Date(currentItem.timeStamp).toLocaleString()
-                : "")
-            }}</v-list-item-subtitle>
             <v-list-item-subtitle
               v-if="currentItem && currentItem.linkId"
               @click="selectItem(getItemById(currentItem.linkId))"
@@ -181,7 +186,6 @@
 
           <form v-if="editedItem" class="mt-4">
             <v-text-field
-              ref="inputName"
               v-model="editedItem.name"
               label="Bezeichnung"
             ></v-text-field>
@@ -244,6 +248,7 @@ export default {
     withDeletedItems: false,
     selectedItem: null,
     currentItem: null,
+    newItemName: '',
     editedItem: null,
     cutedItem: null,
     copiedItem: null,
@@ -309,7 +314,6 @@ export default {
     } else {
       this.myData = []
     }
-    // this.$refs.inputName.focus()
 
     this.getFromFirestore()
   },
@@ -545,6 +549,7 @@ export default {
           this.currentItem = this.getItemById(item.linkId)
         } else {
           this.currentItem = item
+          this.$refs.inputName.focus()
         }
         this.selectedItem = null
       } else {
@@ -576,16 +581,20 @@ export default {
         this.navigateList.splice(len - 1, 1)
       }
     },
-    newItem () {
+    setNewItem () {
       this.editedItem = {}
       if (this.currentItem) {
+        if (this.currentItem.toCloud) {
+          // Cloud-Vorschlag aus Oberpunkt
+          this.editedItem.toCloud = true
+        }
         const children = this.myData.filter(
           (i) => i.parentId === this.currentItem.id
         )
         if (this.currentItem) {
           this.editedItem.parentId = this.currentItem.id
         }
-        if (this.currentItem.unit.includes('/')) {
+        if (this.currentItem.unit && this.currentItem.unit.includes('/')) {
           if (children.length === 0) {
             this.editedItem.unit = this.currentItem.unit.split('/')[0]
           } else {
@@ -611,6 +620,12 @@ export default {
           }
         }
       }
+    },
+    saveNewItemName () {
+      this.setNewItem()
+      this.editedItem.name = this.newItemName
+      this.newItemName = ''
+      this.save(this.editedItem)
     },
     modifyItem () {
       this.editedItem = { ...this.selectedItem }
@@ -663,10 +678,10 @@ export default {
       if (this.cutedItem) {
         this.cutedItem.timeStamp = new Date()
         this.myData.push(this.cutedItem)
-        this.cutedItem = null
+        this.save(this.cutedItem)
       } else {
         pasteCopiedItem(this.copiedItem, this.myData)
-        this.copiedItem = null
+        this.save(this.copiedItem)
       }
 
       this.storeData()
@@ -683,35 +698,23 @@ export default {
         })
       }
     },
-    save () {
-      this.editedItem.value = this.numberUs(this.editedItem.value)
-      this.editedItem.timeStamp = new Date()
-      if (!this.editedItem.id) {
-        this.editedItem.id = createUUID()
-        this.myData.push(this.editedItem)
-      } else {
-        const item = this.myData.find((i) => i.id === this.editedItem.id)
-
-        Object.assign(item, this.editedItem)
-        /*
-        item.parentId = this.editedItem.parentId
-        item.linkId = this.editedItem.linkId
-        item.name = this.editedItem.name
-        item.value = this.editedItem.value
-        item.unit = this.editedItem.unit
-        item.timeStamp = this.editedItem.timeStamp
-        */
+    save (item) {
+      item.value = this.numberUs(item.value)
+      item.timeStamp = new Date()
+      if (!item.id) {
+        item.id = createUUID()
+        this.myData.push(item)
       }
 
-      if (this.editedItem.toCloud) {
-        const cloudItem = { ...this.editedItem }
+      if (item.toCloud) {
+        const cloudItem = { ...item }
         delete cloudItem.toCloud
         delete cloudItem.id
 
         firebase
           .firestore()
           .collection('data')
-          .doc(this.editedItem.id)
+          .doc(item.id)
           .set(cloudItem)
           .then((ref) => {
             console.log('Added doc with ID: ', ref.id)
