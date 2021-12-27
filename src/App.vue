@@ -341,7 +341,7 @@ export default {
     itemTreeToMyData (item) {
       item.toCloud = true
       this.setItemToMyData(item)
-      this.myData
+      this.cloudItems
         .filter((i) => i.parentId === item.id)
         .forEach((child) => {
           this.itemTreeToMyData(child)
@@ -655,13 +655,11 @@ export default {
       } else {
         this.myData.splice(this.myData.indexOf(this.selectedItem), 1)
       }
-      this.storeData()
-      this.selectedItem = null
+      this.save(this.selectedItem)
     },
     restoreItem () {
       this.selectedItem.deleted = false
-      this.storeData()
-      this.selectedItem = null
+      this.save(this.selectedItem)
     },
     pasteItem () {
       let item
@@ -683,8 +681,6 @@ export default {
         pasteCopiedItem(this.copiedItem, this.myData)
         this.save(this.copiedItem)
       }
-
-      this.storeData()
 
       function pasteCopiedItem (item, data) {
         const oldId = item.id
