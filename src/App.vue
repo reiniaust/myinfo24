@@ -640,6 +640,7 @@ export default {
         this.myData.splice(this.myData.indexOf(this.selectedItem), 1)
       }
       this.save(this.selectedItem)
+      this.selectedItem = null
     },
     restoreItem () {
       this.selectedItem.deleted = false
@@ -679,12 +680,13 @@ export default {
       }
     },
     save (item) {
+      item.name = item.name.trim()
       item.value = this.numberUs(item.value)
       item.timeStamp = new Date()
       if (!item.id) {
         item.id = createUUID()
-        this.myData.push(item)
       }
+      this.setItemToMyData(item)
 
       if (item.toCloud) {
         const cloudItem = { ...item }
@@ -696,9 +698,11 @@ export default {
           .collection('data')
           .doc(item.id)
           .set(cloudItem)
+          /*
           .then((ref) => {
             console.log('Added doc with ID: ', ref.id)
           })
+          */
       }
 
       this.storeData()
@@ -707,96 +711,7 @@ export default {
       this.cutedItem = null
       this.copiedItem = null
     },
-    /*
-    calculateForParent(item) {
-      let count = 0;
-      while (
-        count < 10 &&
-        item &&
-        (item.value || item.linkId) &&
-        item.parentId
-      ) {
-        let parentItem = this.myData.find((i) => i.id === item.parentId);
-        if (parentItem) {
-          parentItem.value = 0.0;
-          let multiplierUnit = null;
-          let multiplier1 = 1;
-          let multiplier2 = 1;
-          let divisorUnit = null;
-          let divisor = 1;
-          let percent = 100;
-          if (parentItem.unit && parentItem.unit.includes("/")) {
-            // wenn Einheit z.B. Eur/st
-            multiplierUnit = this.getUnitByName(parentItem.unit.split("/")[0]);
-            divisorUnit = this.getUnitByName(parentItem.unit.split("/")[1]);
-          }
-
-          let items = this.myData.filter((i) => i.parentId === item.parentId);
-
-          if (items.length > 1) {
-            if (
-              items.filter(
-                (i) => this.isNull(i.unit) === this.isNull(parentItem.unit)
-              ).length === items.length
-            ) {
-              items.forEach((i) => (parentItem.value += parseFloat(i.value)));
-            } else {
-              if (parentItem.unit) {
-                items.forEach((item) => {
-                  if (item.linkId) {
-                    item = this.getItemById(item.linkId);
-                  }
-                  let unit = this.getUnitByName(item.unit);
-                  if (unit.name.includes("%")) {
-                    if (unit.name.includes("Aufschlag")) {
-                      percent = eval(item.value) + 100;
-                    } else {
-                      percent = item.value;
-                    }
-                  } else {
-                    let value = eval(item.value);
-                    if (parentItem.unit && parentItem.unit.includes("/")) {
-                      if (unit.base.split("/")[0] === multiplierUnit.base) {
-                        multiplier1 = value * unit.value;
-                      }
-                      if (unit.base.split("/")[0] === divisorUnit.base) {
-                        divisor = value * unit.value;
-                      }
-                    } else {
-                      if (item.unit) {
-                        if (!item.unit.includes("/")) {
-                          multiplier1 = value * unit.value;
-                        }
-                        if (item.unit.includes("/")) {
-                          multiplier2 = value * unit.value;
-                        }
-                      }
-                    }
-                  }
-                });
-                parentItem.value = (multiplier1 * multiplier2) / divisor;
-                parentItem.value =
-                  (parentItem.value /
-                    this.getUnitByName(parentItem.unit).value) *
-                  (percent / 100);
-              }
-            }
-          }
-        }
-        item = parentItem;
-        count += 1;
-      }
-    }, */
     storeData () {
-      /*
-      this.myData.forEach((item) => {
-        if (item.unit === "%") {
-          item.unit = "% Aufschlag";
-        }
-      });
-      this.myData.forEach((item) => {
-        this.calculateForParent(item);
-      }); */
       localStorage.setItem('myinfo24-data', JSON.stringify(this.myData))
     },
     download () {
