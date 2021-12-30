@@ -20,10 +20,10 @@
       </v-btn>
       <div v-if="!editedItem && !cutedItem && !copiedItem">
         <div v-if="selectedItem">
-          <v-btn :disabled="selectedIndex() === 0" text small @click="moveItem(-1)">
+          <v-btn :disabled="selectedIndex() === 0" text small @click="moveItemUp()">
             <v-icon>mdi-arrow-up</v-icon>
           </v-btn>
-          <v-btn :disabled="selectedIndex() + 1 === items().length" text small @click="moveItem(1)">
+          <v-btn :disabled="selectedIndex() + 1 === currentItems().length" text small @click="moveItemDown()">
             <v-icon>mdi-arrow-down</v-icon>
           </v-btn>
           <!-- Ändern -->
@@ -77,9 +77,6 @@
           <v-list-item v-if="currentItem" text small>
             <v-list-item-title>{{ 'id: ' + currentItem.id }}</v-list-item-title>
           </v-list-item>
-          <v-list-item text small>
-            <v-list-item-title>App-Version 1.0.8</v-list-item-title>
-          </v-list-item>
         </v-list>
       </v-menu>
     </v-app-bar>
@@ -100,12 +97,14 @@
             <v-icon>mdi-arrow-right</v-icon>
           </v-btn>
         </v-row>
-        <v-row v-if="!editedItem">
-          <v-text-field ref="inputName" v-model="newItemName" label="Neuer Eintrag"></v-text-field>
-          <v-btn v-if="newItemName !== ''" text @click="saveNewItemName">
-            <v-icon>mdi-content-save</v-icon>
-          </v-btn>
-        </v-row>
+        <form v-if="!editedItem">
+          <v-row>
+              <v-text-field ref="inputName" v-model="newItemName" label="Neuer Eintrag"></v-text-field>
+              <v-btn v-if="newItemName !== ''" type="submit" text @click="saveNewItemName">
+                <v-icon>mdi-content-save</v-icon>
+              </v-btn>
+          </v-row>
+        </form>
 
         <v-row class="mb-2" v-if="currentItem">
           <div class="mr-1" @click="selectItem(null)">Home ></div>
@@ -133,7 +132,7 @@
           </div>
 
           <div v-if="!editedItem">
-            <v-list-item v-for="(item, i) in items()" :key="i">
+            <v-list-item v-for="(item, i) in currentItems()" :key="i">
               <v-list-item-content :class="item === selectedItem ? 'font-weight-bold' : ''">
                 <v-list-item-title
                   :class="item.deleted ? 'text-decoration-line-through' : ''"
@@ -289,8 +288,31 @@ export default {
     }
 
     this.getFromFirestore()
+
+    // Hilfe hinzufügen
+    const helpItem = this.cloudItems.find(i => this.searchText.substring(4) === 'id: 2021-11-16T18:27:35.008Z')
+    this.itemTreeToMyData(helpItem)
+
+    this.setPosToItems(null)
   },
   methods: {
+    setPosToItems (parent) {
+      let items
+      if (parent) {
+        items = this.myData.filter(
+          (i) => i.parentId === parent.id
+        )
+      } else {
+        items = this.myData.filter((i) => !i.parentId)
+      }
+      for (let index = 0; index < items.length; index++) {
+        if (!items[index].pos) {
+          items[index].pos = index + 1
+          this.save(items[index])
+          this.setPosToItems(items[index])
+        }
+      }
+    },
     updateAvailable (event) {
       this.registration = event.detail
       this.updateExists = true
@@ -338,7 +360,7 @@ export default {
         return this.myData.filter((i) => !i.deleted)
       }
     },
-    items () {
+    currentItems () {
       let items
       if (this.currentItem) {
         items = this.shownData().filter(
@@ -347,10 +369,10 @@ export default {
       } else {
         items = this.shownData().filter((i) => !i.parentId)
       }
-      return items
+      return items.sort((a, b) => a.pos - b.pos)
     },
     selectedIndex () {
-      return this.items().indexOf(this.selectedItem)
+      return this.currentItems().indexOf(this.selectedItem)
     },
     calculatedValue (parentItem) {
       let calcValue = 0.0
@@ -500,7 +522,7 @@ export default {
     childrenString (item) {
       let children = ''
       this.shownData()
-        .filter((i) => i.parentId === item.id)
+        .filter((i) => i.parentId === item.id).sort((a, b) => a.pos - b.pos)
         .forEach((i) => {
           if (children !== '') {
             children += ', '
@@ -533,7 +555,7 @@ export default {
           this.currentItem = this.getItemById(item.linkId)
         } else {
           this.currentItem = item
-          this.$refs.inputName.focus()
+          // this.$refs.inputName.focus()
         }
         this.selectedItem = null
       } else {
@@ -614,17 +636,28 @@ export default {
     modifyItem () {
       this.editedItem = { ...this.selectedItem }
     },
-    moveItem (step) {
-      const item = this.selectedItem
-      const index = this.myData.indexOf(item)
-      const nextItem = this.items()[this.selectedIndex() + step]
-      this.myData.splice(index, 1)
-      const nextIndex = this.myData.indexOf(nextItem)
-      const endArray = this.myData.slice(nextIndex + (step === -1 ? 0 : 1))
-      this.myData = this.myData.slice(0, nextIndex + (step === -1 ? 0 : 1))
-      this.myData.push(item)
-      this.myData = this.myData.concat(endArray)
-      this.storeData()
+    moveItemUp () {
+      const posBefore = this.currentItems()[this.selectedIndex() - 1].pos
+      let posBeforeBefore = 0
+      if (this.selectedIndex() > 1) {
+        posBeforeBefore = this.currentItems()[this.selectedIndex() - 2].pos
+      }
+      this.selectedItem.pos = posBeforeBefore + (posBefore - posBeforeBefore) / 2
+      this.save(this.selectedItem)
+
+      // Damit nach einem neuen Eintrag die Anzeige aktualisiert wird
+      this.resetSelectedItem()
+    },
+    moveItemDown () {
+      const posNext = this.currentItems()[this.selectedIndex() + 1].pos
+      if (this.selectedIndex() + 2 === this.currentItems().length) {
+        this.selectedItem.pos = posNext + 1
+      } else {
+        const posNextNext = this.currentItems()[this.selectedIndex() + 2].pos
+        this.selectedItem.pos = posNext + (posNextNext - posNext) / 2
+      }
+      this.save(this.selectedItem)
+      this.resetSelectedItem()
     },
     cutItem () {
       this.cutedItem = { ...this.selectedItem }
@@ -680,11 +713,20 @@ export default {
       }
     },
     save (item) {
-      item.name = item.name.trim()
+      if (item.name && item.name.trim()) {
+        item.name = item.name.trim()
+      }
       item.value = this.numberUs(item.value)
       item.timeStamp = new Date()
       if (!item.id) {
         item.id = createUUID()
+
+        // Position (Reihenfolge) ermitteln
+        if (this.currentItems().length === 0) {
+          item.pos = 1
+        } else {
+          item.pos = this.currentItems()[this.currentItems().length - 1].pos + 1
+        }
       }
       this.setItemToMyData(item)
 
@@ -852,6 +894,11 @@ export default {
     },
     isNumeric (value) {
       return !isNaN(parseFloat(value)) && isFinite(value)
+    },
+    resetSelectedItem () {
+      const id = this.selectedItem.id
+      this.selectedItem = null
+      this.selectedItem = this.myData.find((i) => i.id === id)
     }
   }
 }
