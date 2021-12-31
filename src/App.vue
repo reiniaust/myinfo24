@@ -37,10 +37,6 @@
           <v-btn v-if="selectedItem.deleted" text small @click="restoreItem">
             <v-icon>mdi-restore</v-icon>
           </v-btn>
-          <!-- Löschen -->
-          <v-btn text small @click="deleteItem">
-            <v-icon>mdi-delete</v-icon>
-          </v-btn>
         </div>
       </div>
       <v-btn v-if="editedItem" text small @click="save(editedItem)">
@@ -106,6 +102,7 @@
           </v-row>
         </form>
 
+        <!-- Pfad -->
         <v-row class="mb-2" v-if="currentItem">
           <div class="mr-1" @click="selectItem(null)">Home ></div>
           <div
@@ -131,8 +128,12 @@
             </v-list-item-subtitle>
           </div>
 
+          <!-- Liste -->
           <div v-if="!editedItem">
             <v-list-item v-for="(item, i) in currentItems()" :key="i">
+              <v-list-item-icon>
+                <v-icon v-if="item.toCloud" small>mdi-cloud</v-icon>
+              </v-list-item-icon>
               <v-list-item-content :class="item === selectedItem ? 'font-weight-bold' : ''">
                 <v-list-item-title
                   :class="item.deleted ? 'text-decoration-line-through' : ''"
@@ -156,6 +157,13 @@
                   @click="selectItem(item)"
                 >{{ childrenString(item) }}</v-list-item-subtitle>
               </v-list-item-content>
+
+              <!-- Löschen -->
+              <v-list-item-action>
+                <v-btn v-if="!item.deleted" icon>
+                  <v-icon small @click="deleteItem(item)">mdi-delete</v-icon>
+                </v-btn>
+              </v-list-item-action>
             </v-list-item>
           </div>
 
@@ -289,10 +297,6 @@ export default {
 
     this.getFromFirestore()
 
-    // Hilfe hinzufügen
-    const helpItem = this.cloudItems.find(i => this.searchText.substring(4) === 'id: 2021-11-16T18:27:35.008Z')
-    this.itemTreeToMyData(helpItem)
-
     this.setPosToItems(null)
   },
   methods: {
@@ -342,6 +346,10 @@ export default {
             this.itemTreeToMyData(cloudItem)
           }
         })
+
+        // Hilfe hinzufügen
+        const helpItem = this.cloudItems.find(i => i.id === '2021-11-16T18:27:35.008Z')
+        this.itemTreeToMyData(helpItem)
       })
     },
     itemTreeToMyData (item) {
@@ -666,12 +674,9 @@ export default {
     copyItem () {
       this.copiedItem = { ...this.selectedItem }
     },
-    deleteItem () {
-      if (!this.selectedItem.deleted) {
-        this.selectedItem.deleted = true
-      } else {
-        this.myData.splice(this.myData.indexOf(this.selectedItem), 1)
-      }
+    deleteItem (item) {
+      this.selectedItem = item
+      this.selectedItem.deleted = true
       this.save(this.selectedItem)
       this.selectedItem = null
     },
