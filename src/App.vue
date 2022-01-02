@@ -114,76 +114,82 @@
         </v-row>
 
         <v-list>
-          <div v-if="!(editedItem && editedItem.id)" class="mb-2">
-            <h3>{{ currentItem ? showItem(currentItem) : "Home" }}</h3>
-            <v-list-item-subtitle
-              v-if="currentItem && currentItem.linkId"
-              @click="selectItem(getItemById(currentItem.linkId))"
-            >
-              {{
-              "Verknüpfung: " +
-              pathString(getItemById(currentItem.linkId)) +
-              showItem(getItemById(currentItem.linkId))
-              }}
-            </v-list-item-subtitle>
-          </div>
+          <v-list-item-group
+            v-model="selIndex"
+            color="primary"
+          >
+            <div v-if="!(editedItem && editedItem.id)" class="mb-2">
+              <h3>{{ currentItem ? showItem(currentItem) : "Home" }}</h3>
+              <v-list-item-subtitle
+                v-if="currentItem && currentItem.linkId"
+                @click="selectItem(getItemById(currentItem.linkId))"
+              >
+                {{
+                "Verknüpfung: " +
+                pathString(getItemById(currentItem.linkId)) +
+                showItem(getItemById(currentItem.linkId))
+                }}
+              </v-list-item-subtitle>
+            </div>
 
-          <!-- Liste -->
-          <div v-if="!editedItem">
-            <v-list-item v-for="(item, i) in currentItems()" :key="i">
-              <v-list-item-icon>
-                <v-icon v-if="item.toCloud" small>mdi-cloud</v-icon>
-              </v-list-item-icon>
-              <v-list-item-content :class="item === selectedItem ? 'font-weight-bold' : ''">
-                <v-list-item-title
-                  :class="item.deleted ? 'text-decoration-line-through' : ''"
-                  v-text="
-                    isNull(item.name) +
-                    ' ' +
-                    numberDe(
-                      Math.round(resultEval(calculatedValue(item)) * 1000) /
-                        1000
-                    ) +
-                    ' ' +
-                    isNull(item.unit) +
-                    (item.linkId
-                      ? ' -> ' + showItem(getItemById(item.linkId))
-                      : '')
-                  "
-                  @click="selectItem(item, true)"
-                ></v-list-item-title>
-                <v-list-item-subtitle
-                  v-if="childrenString(item) !== ''"
-                  @click="selectItem(item)"
-                >{{ childrenString(item) }}</v-list-item-subtitle>
-              </v-list-item-content>
+            <!-- Liste -->
+            <div v-if="!editedItem">
+              <v-list-item v-for="(item, i) in currentItems()" :key="i">
+                <v-list-item-icon>
+                  <v-icon v-if="item.toCloud" small>mdi-cloud</v-icon>
+                </v-list-item-icon>
+                <v-list-item-content :class="item.unread ? 'font-weight-bold' : ''">
+                  <v-list-item-title
+                    color="primary"
+                    :class="item.deleted ? 'text-decoration-line-through' : ''"
+                    v-text="
+                      isNull(item.name) +
+                      ' ' +
+                      numberDe(
+                        Math.round(resultEval(calculatedValue(item)) * 1000) /
+                          1000
+                      ) +
+                      ' ' +
+                      isNull(item.unit) +
+                      (item.linkId
+                        ? ' -> ' + showItem(getItemById(item.linkId))
+                        : '')
+                    "
+                    @click="selectItem(item, true)"
+                  ></v-list-item-title>
+                  <v-list-item-subtitle
+                    v-if="childrenString(item) !== ''"
+                    @click="selectItem(item)"
+                  >{{ childrenString(item) }}</v-list-item-subtitle>
+                </v-list-item-content>
 
-              <!-- Löschen -->
-              <v-list-item-action>
-                <v-btn v-if="!item.deleted" icon>
-                  <v-icon small @click="deleteItem(item)">mdi-delete</v-icon>
-                </v-btn>
-              </v-list-item-action>
-            </v-list-item>
-          </div>
+                <!-- Löschen -->
+                <v-list-item-action>
+                  <v-btn icon>
+                    <v-icon v-if="!item.deleted" small @click="deleteItem(item)">mdi-delete</v-icon>
+                  </v-btn>
+                </v-list-item-action>
+              </v-list-item>
+            </div>
 
-          <form v-if="editedItem" class="mt-4">
-            <v-text-field v-model="editedItem.name" label="Bezeichnung"></v-text-field>
-            <v-text-field v-model="numberEdit" label="Zahl oder Formel"></v-text-field>
-            <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
-            <v-autocomplete
-              v-model="editedItem.linkId"
-              :items="
-                myData.map((i) => {
-                  return { id: i.id, name: pathString(i) };
-                })
-              "
-              item-value="id"
-              item-text="name"
-              label="Verknüpfung"
-            ></v-autocomplete>
-            <v-checkbox v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
-          </form>
+            <form v-if="editedItem" class="mt-4">
+              <v-text-field v-model="editedItem.name" label="Bezeichnung"></v-text-field>
+              <v-text-field v-model="numberEdit" label="Zahl oder Formel"></v-text-field>
+              <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
+              <v-autocomplete
+                v-model="editedItem.linkId"
+                :items="
+                  myData.map((i) => {
+                    return { id: i.id, name: pathString(i) };
+                  })
+                "
+                item-value="id"
+                item-text="name"
+                label="Verknüpfung"
+              ></v-autocomplete>
+              <v-checkbox v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
+            </form>
+          </v-list-item-group>
         </v-list>
 
         <v-list v-if="linkedItems().length > 0">
@@ -217,6 +223,7 @@ export default {
     // items: null,
     withDeletedItems: false,
     selectedItem: null,
+    selIndex: null,
     currentItem: null,
     newItemName: '',
     editedItem: null,
@@ -549,7 +556,7 @@ export default {
       }
     },
     selectItem (item, fromList) {
-      if (!fromList || (this.selectedItem && this.selectedItem === item)) {
+      if (!fromList || (this.selectedItem && this.selectedItem === item) || item.unread) {
         if (this.currentItem) {
           if (
             this.currentItem !== this.navigateList[this.navigateList.length - 1]
@@ -566,6 +573,10 @@ export default {
           // this.$refs.inputName.focus()
         }
         this.selectedItem = null
+        if (item.unread) {
+          delete item.unread
+          this.storeData()
+        }
       } else {
         this.selectedItem = item
       }
@@ -655,6 +666,7 @@ export default {
 
       // Damit nach einem neuen Eintrag die Anzeige aktualisiert wird
       this.resetSelectedItem()
+      this.selIndex -= 1
     },
     moveItemDown () {
       const posNext = this.currentItems()[this.selectedIndex() + 1].pos
@@ -666,6 +678,7 @@ export default {
       }
       this.save(this.selectedItem)
       this.resetSelectedItem()
+      this.selIndex += 1
     },
     cutItem () {
       this.cutedItem = { ...this.selectedItem }
@@ -829,7 +842,16 @@ export default {
     setItemToMyData (item) {
       const foundItem = this.myData.find((i) => i.id === item.id)
       if (!foundItem) {
+        item.unread = true
         this.myData.push(item)
+        let count = 0
+        while (count < 10 && item && item.parentId) {
+          item = this.myData.find((i) => i.id === item.parentId)
+          if (item) {
+            item.unread = true
+          }
+          count += 1
+        }
       } else {
         // if (foundItem.modified && (!item.modified || new Date(foundItem.modified) > new Date(item.modified))) {
         Object.assign(foundItem, item)
