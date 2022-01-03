@@ -573,7 +573,8 @@ export default {
           // this.$refs.inputName.focus()
         }
         this.selectedItem = null
-        if (item.unread) {
+        this.selIndex = null
+        if (item && item.unread) {
           delete item.unread
           this.storeData()
         }
@@ -599,6 +600,7 @@ export default {
       if (this.selectedItem || this.editedItem || this.cutedItem) {
         this.editedItem = null
         this.selectedItem = null
+        this.selIndex = null
         this.cutedItem = null
       } else {
         const len = this.navigateList.length
@@ -692,6 +694,7 @@ export default {
       this.selectedItem.deleted = true
       this.save(this.selectedItem)
       this.selectedItem = null
+      this.selIndex = null
     },
     restoreItem () {
       this.selectedItem.deleted = false
@@ -844,6 +847,16 @@ export default {
       if (!foundItem) {
         item.unread = true
         this.myData.push(item)
+      } else {
+        if (foundItem.timeStamp && foundItem.timeStamp.seconds < item.timeStamp.seconds) {
+          item.unread = true
+          if (item.deleted) {
+            this.withDeletedItems = true
+          }
+          Object.assign(foundItem, item)
+        }
+      }
+      if (item.unread) {
         let count = 0
         while (count < 10 && item && item.parentId) {
           item = this.myData.find((i) => i.id === item.parentId)
@@ -852,10 +865,6 @@ export default {
           }
           count += 1
         }
-      } else {
-        // if (foundItem.modified && (!item.modified || new Date(foundItem.modified) > new Date(item.modified))) {
-        Object.assign(foundItem, item)
-        // }
       }
     },
     getUnitByName (unitName) {
