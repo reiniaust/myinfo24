@@ -361,7 +361,7 @@ export default {
     },
     itemTreeToMyData (item) {
       item.toCloud = true
-      this.setItemToMyData(item)
+      this.setItemToMyData(item, false)
       this.cloudItems
         .filter((i) => i.parentId === item.id)
         .forEach((child) => {
@@ -749,7 +749,7 @@ export default {
           item.pos = this.currentItems()[this.currentItems().length - 1].pos + 1
         }
       }
-      this.setItemToMyData(item)
+      this.setItemToMyData(item, true)
 
       if (item.toCloud) {
         const cloudItem = { ...item }
@@ -835,21 +835,26 @@ export default {
       fileReader.onload = function () {
         const uploadData = JSON.parse(fileReader.result)
         uploadData.forEach((item) => {
-          thisHelp.setItemToMyData(item)
+          thisHelp.setItemToMyData(item, false)
 
           localStorage.setItem('myinfo24-data', JSON.stringify(thisHelp.myData))
           window.location.reload()
         })
       }
     },
-    setItemToMyData (item) {
+    setItemToMyData (item, fromSave) {
+      delete item.unread
       const foundItem = this.myData.find((i) => i.id === item.id)
       if (!foundItem) {
-        item.unread = true
+        if (!fromSave) {
+          item.unread = true
+        }
         this.myData.push(item)
       } else {
         if (foundItem.timeStamp && foundItem.timeStamp.seconds < item.timeStamp.seconds) {
-          item.unread = true
+          if (!fromSave) {
+            item.unread = true
+          }
           if (item.deleted) {
             this.withDeletedItems = true
           }
