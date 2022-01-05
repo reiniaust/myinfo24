@@ -851,12 +851,12 @@ export default {
         }
         this.myData.push(item)
       } else {
-        if (foundItem.timeStamp && foundItem.timeStamp.seconds < item.timeStamp.seconds) {
+        if (fromSave || (foundItem.timeStamp && foundItem.timeStamp.seconds < item.timeStamp.seconds)) {
           if (!fromSave) {
             item.unread = true
-          }
-          if (item.deleted) {
-            this.withDeletedItems = true
+            if (item.deleted) {
+              this.withDeletedItems = true
+            }
           }
           Object.assign(foundItem, item)
         }
