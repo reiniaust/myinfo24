@@ -89,7 +89,7 @@
       <div class="mb-2">
         <v-row v-if="!editedItem">
           <v-text-field v-model="searchText" label="Suche"></v-text-field>
-          <v-btn v-if="searchText !== ''" text @click="searchItem">
+          <v-btn text @click="searchItem">
             <v-icon>mdi-arrow-right</v-icon>
           </v-btn>
         </v-row>
@@ -139,7 +139,7 @@
                   <v-icon v-if="item.toCloud" small>mdi-cloud</v-icon>
                 </v-list-item-icon>
                 <v-list-item-content :class="item.unread ? 'font-weight-bold' : ''">
-                  <v-list-item-title
+                  <div
                     color="primary"
                     :class="item.deleted ? 'text-decoration-line-through' : ''"
                     v-text="
@@ -156,7 +156,7 @@
                         : '')
                     "
                     @click="selectItem(item, true)"
-                  ></v-list-item-title>
+                  ></div>
                   <v-list-item-subtitle
                     v-if="childrenString(item) !== ''"
                     @click="selectItem(item)"
@@ -238,6 +238,7 @@ export default {
       const units = [
         { name: '' },
         { name: 'Eur' },
+        { name: 'ct', value: 0.01, base: 'Eur' },
         { name: 'St' },
         { name: 'kg' },
         { name: 'to', value: 1000, base: 'kg' },
@@ -245,11 +246,14 @@ export default {
         { name: 'cm', value: 10, base: 'mm' },
         { name: 'm', value: 1000, base: 'mm' },
         { name: 'km', value: 1000 * 1000, base: 'mm' },
+        { name: 'l' },
+        { name: 'm³', value: 1000, base: 'l' },
         { name: 'Min' },
         { name: 'Std', value: 60, base: 'Min' },
-        { name: 'kWh' },
         { name: 'Tage', singular: 'Tag', value: 24 * 60, base: 'Min' },
+        { name: 'Monate', singular: 'Monat', value: 24 * 60 * 12, base: 'Min' },
         { name: 'Jahre', singular: 'Jahr', value: 24 * 60 * 365, base: 'Min' },
+        { name: 'kWh' },
         { name: 'Los' },
         { name: '% Aufschlag' },
         { name: '% Anteil' }
@@ -372,7 +376,7 @@ export default {
       if (this.withDeletedItems) {
         return this.myData
       } else {
-        return this.myData.filter((i) => !i.deleted)
+        return this.myData.filter((i) => !i.deleted || i.unread)
       }
     },
     currentItems () {
@@ -407,7 +411,7 @@ export default {
         (i) => i.parentId === parentItem.id
       )
 
-      if (items.length > 1) {
+      if (items.length >= 1) {
         if (
           items.filter(
             (i) => this.isNull(i.unit) === this.isNull(parentItem.unit)
@@ -477,7 +481,7 @@ export default {
         if (this.searchText !== this.searchTextOld) {
           this.searchIndex = 0
         }
-        const searchFilter = this.shownData().filter((i) => this.searchFound(i))
+        const searchFilter = this.shownData().filter((i) => this.searchFound(i)).sort((a, b) => (a.pos ? a.pos : 0) - (b.pos ? b.pos : 0))
         if (searchFilter) {
           if (this.searchIndex === searchFilter.length) {
             this.searchIndex = 0
@@ -493,19 +497,23 @@ export default {
     },
     searchFound (item) {
       let found = false
-      this.searchText.split(' ').forEach((word) => {
-        if (!found) {
-          found =
-            item.name && item.name.toUpperCase().includes(word.toUpperCase())
-        }
-      })
-      this.searchText.split(' ').forEach((word) => {
-        if (found) {
-          found = this.pathString(item)
-            .toUpperCase()
-            .includes(word.toUpperCase())
-        }
-      })
+      if (this.searchText === '') {
+        found = true
+      } else {
+        this.searchText.split(' ').forEach((word) => {
+          if (!found) {
+            found =
+              item.name && item.name.toUpperCase().includes(word.toUpperCase())
+          }
+        })
+        this.searchText.split(' ').forEach((word) => {
+          if (found) {
+            found = this.pathString(item)
+              .toUpperCase()
+              .includes(word.toUpperCase())
+          }
+        })
+      }
       return found
     },
     unitNames () {
@@ -543,7 +551,7 @@ export default {
             children += ', '
           }
           children += i.linkId
-            ? ' -> ' + this.getItemById(i.linkId).name
+            ? ' -> ' + this.getItemById(i.linkId).name ? this.getItemById(i.linkId).name : ''
             : this.isNull(i.name)
         })
       return children
@@ -573,7 +581,7 @@ export default {
           // this.$refs.inputName.focus()
         }
         this.selectedItem = null
-        this.selIndex = null
+        // this.selIndex = null
         if (item && item.unread) {
           delete item.unread
           this.storeData()
@@ -581,6 +589,7 @@ export default {
       } else {
         this.selectedItem = item
       }
+      // this.selIndex = null
     },
     getItemById (id) {
       return this.myData.find((i) => i.id === id)
@@ -600,13 +609,13 @@ export default {
       if (this.selectedItem || this.editedItem || this.cutedItem) {
         this.editedItem = null
         this.selectedItem = null
-        this.selIndex = null
         this.cutedItem = null
       } else {
         const len = this.navigateList.length
         this.currentItem = this.navigateList[len - 1]
         this.navigateList.splice(len - 1, 1)
       }
+      this.selIndex = null
     },
     setNewItem () {
       this.editedItem = {}
@@ -739,15 +748,16 @@ export default {
       }
       item.value = this.numberUs(item.value)
       item.timeStamp = new Date()
-      if (!item.id) {
-        item.id = createUUID()
-
+      if (!item.id || this.cutedItem) {
         // Position (Reihenfolge) ermitteln
         if (this.currentItems().length === 0) {
           item.pos = 1
         } else {
           item.pos = this.currentItems()[this.currentItems().length - 1].pos + 1
         }
+      }
+      if (!item.id) {
+        item.id = createUUID()
       }
       this.setItemToMyData(item, true)
 
@@ -854,22 +864,19 @@ export default {
         if (fromSave || (foundItem.timeStamp && foundItem.timeStamp.seconds < item.timeStamp.seconds)) {
           if (!fromSave) {
             item.unread = true
+            /*
             if (item.deleted) {
               this.withDeletedItems = true
             }
+            */
           }
           Object.assign(foundItem, item)
         }
       }
       if (item.unread) {
-        let count = 0
-        while (count < 10 && item && item.parentId) {
-          item = this.myData.find((i) => i.id === item.parentId)
-          if (item) {
-            item.unread = true
-          }
-          count += 1
-        }
+        this.pathArray(item).forEach((i) => {
+          i.unread = true
+        })
       }
     },
     getUnitByName (unitName) {
