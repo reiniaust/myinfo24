@@ -96,7 +96,7 @@
         <form v-if="!editedItem">
           <v-row>
               <v-text-field ref="inputName" v-model="newItemName" label="Neuer Eintrag"></v-text-field>
-              <v-btn v-if="newItemName !== ''" type="submit" text @click="saveNewItemName">
+              <v-btn :disabled="newItemName === ''" type="submit" text @click="saveNewItemName">
                 <v-icon>mdi-content-save</v-icon>
               </v-btn>
           </v-row>
@@ -120,6 +120,13 @@
           >
             <div v-if="!(editedItem && editedItem.id)" class="mb-2">
               <h3>{{ currentItem ? showItem(currentItem) : "Home" }}</h3>
+              <v-list-item-subtitle
+                v-if="currentItem && currentItem.timeStamp"
+              >
+                {{
+                  getDate(currentItem.timeStamp).toLocaleDateString()
+                }}
+              </v-list-item-subtitle>
               <v-list-item-subtitle
                 v-if="currentItem && currentItem.linkId"
                 @click="selectItem(getItemById(currentItem.linkId))"
@@ -481,7 +488,7 @@ export default {
         if (this.searchText !== this.searchTextOld) {
           this.searchIndex = 0
         }
-        const searchFilter = this.shownData().filter((i) => this.searchFound(i)).sort((a, b) => (a.pos ? a.pos : 0) - (b.pos ? b.pos : 0))
+        const searchFilter = this.shownData().filter((i) => this.searchFound(i)).sort((a, b) => this.getDate(b.timeStamp) - this.getDate(a.timeStamp))
         if (searchFilter) {
           if (this.searchIndex === searchFilter.length) {
             this.searchIndex = 0
@@ -722,7 +729,7 @@ export default {
         item.parentId = null
       }
       if (this.cutedItem) {
-        this.cutedItem.timeStamp = new Date()
+        // this.cutedItem.timeStamp = new Date()
         this.myData.push(this.cutedItem)
         this.save(this.cutedItem)
       } else {
@@ -732,7 +739,7 @@ export default {
 
       function pasteCopiedItem (item, data) {
         const oldId = item.id
-        item.timeStamp = new Date()
+        item.timeStamp = new Date().toISOString()
         data.push(item)
         const items = data.filter((i) => i.parentId === oldId)
         items.forEach((i) => {
@@ -747,7 +754,7 @@ export default {
         item.name = item.name.trim()
       }
       item.value = this.numberUs(item.value)
-      item.timeStamp = new Date()
+      item.timeStamp = new Date().toISOString()
       if (!item.id || this.cutedItem) {
         // Position (Reihenfolge) ermitteln
         if (this.currentItems().length === 0) {
@@ -947,6 +954,21 @@ export default {
       const id = this.selectedItem.id
       this.selectedItem = null
       this.selectedItem = this.myData.find((i) => i.id === id)
+    },
+    getDate (dateOrTimestamp) {
+      if (dateOrTimestamp) {
+        if (dateOrTimestamp instanceof Date) {
+          return dateOrTimestamp
+        } else {
+          if (dateOrTimestamp.seconds) {
+            return new Date(dateOrTimestamp.seconds * 1000)
+          } else {
+            return new Date(dateOrTimestamp)
+          }
+        }
+      } else {
+        return new Date(0)
+      }
     }
   }
 }
