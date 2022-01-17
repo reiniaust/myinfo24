@@ -8,12 +8,15 @@
     </v-snackbar>
     <v-app-bar app color="primary" dark>
       <v-btn
-        :disabled="navigateList.length === 0 && !selectedItem  && !editedItem"
+        :disabled="navigateList.length === 0 && !selectedItem  && !editedItem && !searchVisible"
         text
         small
         @click="goBack"
       >
         <v-icon>mdi-arrow-left</v-icon>
+      </v-btn>
+      <v-btn v-if="!editedItem && !selectedItem && !searchVisible" text small @click="searchVisible=true">
+        <v-icon>mdi-magnify</v-icon>
       </v-btn>
       <v-btn v-if="!editedItem && !selectedItem" text small @click="setNewItem">
         <v-icon>mdi-plus</v-icon>
@@ -87,20 +90,12 @@
 
     <v-main class="ma-8">
       <div class="mb-2">
-        <v-row v-if="!editedItem">
+        <v-row v-if="searchVisible">
           <v-text-field v-model="searchText" label="Suche"></v-text-field>
           <v-btn text @click="searchItem">
             <v-icon>mdi-arrow-right</v-icon>
           </v-btn>
         </v-row>
-        <form v-if="!editedItem">
-          <v-row>
-              <v-text-field ref="inputName" v-model="newItemName" label="Neuer Eintrag"></v-text-field>
-              <v-btn :disabled="newItemName === ''" type="submit" text @click="saveNewItemName">
-                <v-icon>mdi-content-save</v-icon>
-              </v-btn>
-          </v-row>
-        </form>
 
         <!-- Pfad -->
         <v-row class="mb-2" v-if="currentItem">
@@ -199,6 +194,15 @@
           </v-list-item-group>
         </v-list>
 
+        <form v-if="!editedItem" class="ma-6">
+          <v-row>
+              <v-text-field ref="inputName" v-model="newItemName" label="Neuer Eintrag"></v-text-field>
+              <v-btn :disabled="newItemName === ''" type="submit" text @click="saveNewItemName">
+                <v-icon>mdi-content-save</v-icon>
+              </v-btn>
+          </v-row>
+        </form>
+
         <v-list v-if="linkedItems().length > 0">
           <v-list-item-subtitle>Verwendungen</v-list-item-subtitle>
           <v-list-item
@@ -238,6 +242,7 @@ export default {
     copiedItem: null,
     downloaded: false,
     navigateList: [],
+    searchVisible: false,
     searchText: '',
     searchTextOld: '',
     searchIndex: 0,
@@ -258,7 +263,7 @@ export default {
         { name: 'Min' },
         { name: 'Std', value: 60, base: 'Min' },
         { name: 'Tage', singular: 'Tag', value: 24 * 60, base: 'Min' },
-        { name: 'Monate', singular: 'Monat', value: 24 * 60 * 12, base: 'Min' },
+        { name: 'Monate', singular: 'Monat', value: 24 * 60 * 365 / 12, base: 'Min' },
         { name: 'Jahre', singular: 'Jahr', value: 24 * 60 * 365, base: 'Min' },
         { name: 'kWh' },
         { name: 'Los' },
@@ -410,8 +415,8 @@ export default {
       let percent = 100
       if (parentItem.unit && parentItem.unit.includes('/')) {
         // wenn Einheit z.B. Eur/st
-        multiplierUnit = this.getUnitByName(parentItem.unit.split('/')[0])
-        divisorUnit = this.getUnitByName(parentItem.unit.split('/')[1])
+        multiplierUnit = this.getUnitByName(this.baseUnit(parentItem.unit).split('/')[0])
+        divisorUnit = this.getUnitByName(this.baseUnit(parentItem.unit).split('/')[1])
       }
 
       const items = this.shownData().filter(
@@ -421,11 +426,11 @@ export default {
       if (items.length >= 1) {
         if (
           items.filter(
-            (i) => this.isNull(i.unit) === this.isNull(parentItem.unit)
+            (i) => this.baseUnit(i.unit) === this.baseUnit(parentItem.unit)
           ).length === items.length
         ) {
           items.forEach(
-            (i) => (calcValue += parseFloat(this.calculatedValue(i)))
+            (i) => (calcValue += parseFloat(this.baseValue(i.unit, this.calculatedValue(i))))
           )
         } else {
           if (parentItem.unit) {
@@ -433,48 +438,107 @@ export default {
               if (item.linkId) {
                 item = this.getItemById(item.linkId)
               }
-              const unit = this.getUnitByName(item.unit)
-              if (unit.name.includes('%')) {
-                if (unit.name.includes('Aufschlag')) {
+              if (item.unit) {
+                const unit = this.getUnitByName(this.baseUnit(item.unit))
+                if (unit.name.includes('%')) {
+                  if (unit.name.includes('Aufschlag')) {
                   // eslint-disable-next-line no-eval
-                  percent = eval(item.value) + 100
+                    percent = eval(item.value) + 100
+                  } else {
+                    percent = item.value
+                  }
                 } else {
-                  percent = item.value
-                }
-              } else {
                 // eslint-disable-next-line no-eval
-                const value = eval(this.calculatedValue(item))
-                if (parentItem.unit && parentItem.unit.includes('/')) {
-                  if (unit.base.split('/')[0] === multiplierUnit.base) {
-                    multiplier1 = value * unit.value
-                  }
-                  if (unit.base.split('/')[0] === divisorUnit.base) {
-                    divisor = value * unit.value
-                  }
-                } else {
-                  if (item.unit) {
-                    if (!item.unit.includes('/')) {
-                      multiplier1 = value * unit.value
+                  const value = this.baseValue(item.unit, eval(this.calculatedValue(item)))
+                  if (parentItem.unit && parentItem.unit.includes('/')) {
+                    if (unit.base.split('/')[0] === multiplierUnit.name) {
+                      multiplier1 = value // * unit.value
                     }
-                    if (item.unit.includes('/')) {
-                      multiplier2 = value * unit.value
+                    if (unit.base.includes('/') && unit.base.split('/')[1] === divisorUnit.name) {
+                      multiplier2 = value
+                    } else {
+                      if (unit.base.split('/')[0] === divisorUnit.name) {
+                        divisor = value // * unit.value
+                      }
+                    }
+                  } else {
+                    if (item.unit) {
+                      if (!item.unit.includes('/')) {
+                        multiplier1 = value // * unit.value
+                      }
+                      if (item.unit.includes('/')) {
+                        multiplier2 = value // * unit.value
+                      }
                     }
                   }
                 }
               }
             })
             calcValue = (multiplier1 * multiplier2) / divisor
+            calcValue = calcValue * (percent / 100)
+            /*
             calcValue =
               (calcValue / this.getUnitByName(parentItem.unit).value) *
               (percent / 100)
+            */
           }
         }
       }
       if (!calcValue) {
         calcValue = parentItem.value
+      } else {
+        calcValue = this.originValue(parentItem.unit, calcValue)
       }
 
       return calcValue
+    },
+    baseUnit (unit) {
+      let result = ''
+      if (unit) {
+        unit.split('/').forEach(u => {
+          if (result !== '') {
+            result += '/'
+          }
+          if (this.getUnitByName(u).base) {
+            result += this.getUnitByName(u).base
+          } else {
+            result += u
+          }
+        })
+      }
+      return result
+    },
+    baseValue (unit, value) {
+      if (unit) {
+        let result
+        unit.split('/').forEach(u => {
+          const unitValue = this.getUnitByName(u).value ? this.getUnitByName(u).value : 1
+          if (!result) {
+            result = value * unitValue
+          } else {
+            result = result / unitValue
+          }
+        })
+        return result
+      } else {
+        return value
+      }
+    },
+    originValue (unit, baseValue) {
+      if (unit) {
+        let value
+        unit.split('/').forEach(u => {
+          const unitValue = this.getUnitByName(u).value ? this.getUnitByName(u).value : 1
+          if (!value) {
+            value = baseValue / unitValue
+          } else {
+            value = value * unitValue
+          }
+        })
+        return value
+      } else {
+        return baseValue
+      }
     },
     searchItem () {
       if (this.searchText.substring(0, 3) === 'id:') {
@@ -557,9 +621,11 @@ export default {
           if (children !== '') {
             children += ', '
           }
-          children += i.linkId
-            ? ' -> ' + this.getItemById(i.linkId).name ? this.getItemById(i.linkId).name : ''
-            : this.isNull(i.name)
+          if (i.linkId && this.getItemById(i.linkId)) {
+            children += this.isNull(this.getItemById(i.linkId).name)
+          } else {
+            children += this.isNull(i.name)
+          }
         })
       return children
     },
@@ -623,6 +689,7 @@ export default {
         this.navigateList.splice(len - 1, 1)
       }
       this.selIndex = null
+      this.searchVisible = false
     },
     setNewItem () {
       this.editedItem = {}
@@ -868,7 +935,7 @@ export default {
         }
         this.myData.push(item)
       } else {
-        if (fromSave || (foundItem.timeStamp && foundItem.timeStamp.seconds < item.timeStamp.seconds)) {
+        if (fromSave || (foundItem.timeStamp && this.getDate(foundItem.timeStamp) < this.getDate(item.timeStamp))) {
           if (!fromSave) {
             item.unread = true
             /*
