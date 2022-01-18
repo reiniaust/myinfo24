@@ -119,7 +119,7 @@
                 v-if="currentItem && currentItem.timeStamp"
               >
                 {{
-                  getDate(currentItem.timeStamp).toLocaleDateString()
+                  getDate(currentItem.timeStamp).toLocaleDateString() + (currentItem.user ? ' ' + currentItem.user : '')
                 }}
               </v-list-item-subtitle>
               <v-list-item-subtitle
@@ -175,6 +175,7 @@
             </div>
 
             <form v-if="editedItem" class="mt-4">
+              <v-text-field v-model="userName" label="Benutzername"></v-text-field>
               <v-text-field v-model="editedItem.name" label="Bezeichnung"></v-text-field>
               <v-text-field v-model="numberEdit" label="Zahl oder Formel"></v-text-field>
               <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
@@ -238,6 +239,7 @@ export default {
     currentItem: null,
     newItemName: '',
     editedItem: null,
+    userName: 'null',
     cutedItem: null,
     copiedItem: null,
     downloaded: false,
@@ -316,6 +318,9 @@ export default {
       this.myData = this.myData.filter((i) => !(i === null)) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
     } else {
       this.myData = []
+    }
+    if (localStorage.getItem('myinfo24-userName') !== null) {
+      this.userName = localStorage.getItem('myinfo24-userName')
     }
 
     this.getFromFirestore()
@@ -817,49 +822,55 @@ export default {
       }
     },
     save (item) {
-      if (item.name && item.name.trim()) {
-        item.name = item.name.trim()
-      }
-      item.value = this.numberUs(item.value)
-      item.timeStamp = new Date().toISOString()
-      if (!item.id || this.cutedItem) {
-        // Position (Reihenfolge) ermitteln
-        if (this.currentItems().length === 0) {
-          item.pos = 1
-        } else {
-          item.pos = this.currentItems()[this.currentItems().length - 1].pos + 1
+      if (item.toCloud && !this.userName) {
+        alert('Bitte deinen Benutzernamen eingeben.')
+      } else {
+        if (item.name && item.name.trim()) {
+          item.name = item.name.trim()
         }
-      }
-      if (!item.id) {
-        item.id = createUUID()
-      }
-      this.setItemToMyData(item, true)
+        item.value = this.numberUs(item.value)
+        item.timeStamp = new Date().toISOString()
+        if (!item.id || this.cutedItem) {
+        // Position (Reihenfolge) ermitteln
+          if (this.currentItems().length === 0) {
+            item.pos = 1
+          } else {
+            item.pos = this.currentItems()[this.currentItems().length - 1].pos + 1
+          }
+        }
+        if (!item.id) {
+          item.id = createUUID()
+        }
+        this.setItemToMyData(item, true)
 
-      if (item.toCloud) {
-        const cloudItem = { ...item }
-        delete cloudItem.toCloud
-        delete cloudItem.id
+        if (item.toCloud) {
+          const cloudItem = { ...item }
+          delete cloudItem.toCloud
+          delete cloudItem.id
+          cloudItem.user = this.userName
 
-        firebase
-          .firestore()
-          .collection('data')
-          .doc(item.id)
-          .set(cloudItem)
+          firebase
+            .firestore()
+            .collection('data')
+            .doc(item.id)
+            .set(cloudItem)
           /*
           .then((ref) => {
             console.log('Added doc with ID: ', ref.id)
           })
           */
+        }
+
+        this.storeData()
+
+        this.editedItem = null
+        this.cutedItem = null
+        this.copiedItem = null
       }
-
-      this.storeData()
-
-      this.editedItem = null
-      this.cutedItem = null
-      this.copiedItem = null
     },
     storeData () {
       localStorage.setItem('myinfo24-data', JSON.stringify(this.myData))
+      localStorage.setItem('myinfo24-userName', this.userName)
     },
     download () {
       // credit: https://www.bitdegree.org/learn/javascript-download
