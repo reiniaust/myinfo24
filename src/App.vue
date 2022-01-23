@@ -172,6 +172,20 @@
                   </v-btn>
                 </v-list-item-action>
               </v-list-item>
+
+              <v-list-item>
+                <v-list-item-icon>
+                  <v-icon v-if="currentItem && currentItem.toCloud" small>mdi-cloud</v-icon>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-text-field v-model="newItemName" label="Neuer Eintrag" @keydown="newItemNameKeydown"></v-text-field>
+                </v-list-item-content>
+                <v-list-item-action>
+                  <v-btn icon>
+                    <v-icon small @click="saveNewItemName">mdi-content-save</v-icon>
+                  </v-btn>
+                </v-list-item-action>
+              </v-list-item>
             </div>
 
             <form v-if="editedItem" class="mt-4">
@@ -194,15 +208,6 @@
             </form>
           </v-list-item-group>
         </v-list>
-
-        <form v-if="!editedItem" class="ma-6">
-          <v-row>
-              <v-text-field ref="inputName" v-model="newItemName" label="Neuer Eintrag"></v-text-field>
-              <v-btn :disabled="newItemName === ''" type="submit" text @click="saveNewItemName">
-                <v-icon>mdi-content-save</v-icon>
-              </v-btn>
-          </v-row>
-        </form>
 
         <v-list v-if="linkedItems().length > 0">
           <v-list-item-subtitle>Verwendungen</v-list-item-subtitle>
@@ -239,7 +244,7 @@ export default {
     currentItem: null,
     newItemName: '',
     editedItem: null,
-    userName: 'null',
+    userName: '',
     cutedItem: null,
     copiedItem: null,
     downloaded: false,
@@ -328,6 +333,47 @@ export default {
     this.setPosToItems(null)
   },
   methods: {
+    displayNotification (msg) {
+      Notification.requestPermission(function (status) {
+        console.log('Notification permission status:', status)
+      })
+      if (Notification.permission === 'granted') {
+        /*
+        navigator.addEventListener('explore', function () {
+          window.open('https://www.myinfo24.web.app')
+        })
+        */
+        navigator.serviceWorker.getRegistration()
+          .then(function (reg) {
+            if (reg === undefined) {
+              console.log('only works online')
+              return
+            }
+            var options = {
+              body: msg,
+              icon: './static/img/notification-flat.png',
+              vibrate: [100, 50, 100],
+              data: {
+                dateOfArrival: Date.now(),
+                primaryKey: 1
+              },
+              actions: [
+                {
+                  action: 'explore',
+                  title: 'App öffnen',
+                  icon: './static/img/checkmark.png'
+                },
+                {
+                  action: 'close',
+                  title: 'Schließen',
+                  icon: './static/img/xmark.png'
+                }
+              ]
+            }
+            reg.showNotification('myinfo24', options)
+          })
+      }
+    },
     setPosToItems (parent) {
       let items
       if (parent) {
@@ -378,6 +424,15 @@ export default {
         // Hilfe hinzufügen
         const helpItem = this.cloudItems.find(i => i.id === '2021-11-16T18:27:35.008Z')
         this.itemTreeToMyData(helpItem)
+
+        if (this.$route.query.id) {
+          const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === this.$route.query.id)
+          if (cloudItem) {
+            this.itemTreeToMyData(cloudItem)
+            this.storeData()
+          }
+          this.currentItem = this.getItemById(this.$route.query.id)
+        }
       })
     },
     itemTreeToMyData (item) {
@@ -443,7 +498,7 @@ export default {
               if (item.linkId) {
                 item = this.getItemById(item.linkId)
               }
-              if (item.unit) {
+              if (item && item.unit) {
                 const unit = this.getUnitByName(this.baseUnit(item.unit))
                 if (unit.name.includes('%')) {
                   if (unit.name.includes('Aufschlag')) {
@@ -695,6 +750,7 @@ export default {
       }
       this.selIndex = null
       this.searchVisible = false
+      this.newItemName = ''
     },
     setNewItem () {
       this.editedItem = {}
@@ -844,6 +900,14 @@ export default {
         this.setItemToMyData(item, true)
 
         if (item.toCloud) {
+          const oldItem = this.cloudItems.find(i => item.id === i.id)
+          if (oldItem) {
+            firebase
+              .firestore()
+              .collection('archive')
+              .add(oldItem)
+          }
+
           const cloudItem = { ...item }
           delete cloudItem.toCloud
           delete cloudItem.id
@@ -870,7 +934,9 @@ export default {
     },
     storeData () {
       localStorage.setItem('myinfo24-data', JSON.stringify(this.myData))
-      localStorage.setItem('myinfo24-userName', this.userName)
+      if (this.userName) {
+        localStorage.setItem('myinfo24-userName', this.userName)
+      }
     },
     download () {
       // credit: https://www.bitdegree.org/learn/javascript-download
@@ -942,13 +1008,18 @@ export default {
       const foundItem = this.myData.find((i) => i.id === item.id)
       if (!foundItem) {
         if (!fromSave) {
-          item.unread = true
+          if (item.user && item.user !== this.userName) {
+            item.unread = true
+          }
+          this.displayNotification(item.user + ': ' + this.showItem(item))
         }
         this.myData.push(item)
       } else {
         if (fromSave || (foundItem.timeStamp && this.getDate(foundItem.timeStamp) < this.getDate(item.timeStamp))) {
           if (!fromSave) {
-            item.unread = true
+            if (item.user && item.user !== this.userName) {
+              item.unread = true
+            }
             /*
             if (item.deleted) {
               this.withDeletedItems = true
@@ -1032,6 +1103,11 @@ export default {
       const id = this.selectedItem.id
       this.selectedItem = null
       this.selectedItem = this.myData.find((i) => i.id === id)
+    },
+    newItemNameKeydown (e) {
+      if (e.code === 'Enter') {
+        this.saveNewItemName()
+      }
     },
     getDate (dateOrTimestamp) {
       if (dateOrTimestamp) {
