@@ -21,27 +21,6 @@
       <v-btn v-if="!editedItem && !selectedItem" text small @click="setNewItem">
         <v-icon>mdi-plus</v-icon>
       </v-btn>
-      <div v-if="!editedItem && !cutedItem && !copiedItem">
-        <div v-if="selectedItem">
-          <v-btn :disabled="selectedIndex() === 0" text small @click="moveItemUp()">
-            <v-icon>mdi-arrow-up</v-icon>
-          </v-btn>
-          <v-btn :disabled="selectedIndex() + 1 === currentItems().length" text small @click="moveItemDown()">
-            <v-icon>mdi-arrow-down</v-icon>
-          </v-btn>
-          <!-- Ändern -->
-          <v-btn v-if="!selectedItem.deleted" text small @click="modifyItem">
-            <v-icon>mdi-pencil</v-icon>
-          </v-btn>
-          <!-- Ausschneiden -->
-          <v-btn v-if="!selectedItem.deleted" text small @click="cutItem">
-            <v-icon>mdi-content-cut</v-icon>
-          </v-btn>
-          <v-btn v-if="selectedItem.deleted" text small @click="restoreItem">
-            <v-icon>mdi-restore</v-icon>
-          </v-btn>
-        </div>
-      </div>
       <v-btn v-if="editedItem" text small @click="save(editedItem)">
         <v-icon>mdi-content-save</v-icon>
       </v-btn>
@@ -74,7 +53,7 @@
             <v-list-item-title>Daten-Upload</v-list-item-title>
           </v-list-item>
           <v-list-item v-if="currentItem" text small>
-            <v-list-item-title>{{ 'id: ' + currentItem.id }}</v-list-item-title>
+            <v-list-item-title>{{ 'ID: ' + currentItem.id }}</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
@@ -128,8 +107,7 @@
               >
                 {{
                 "Verknüpfung: " +
-                pathString(getItemById(currentItem.linkId)) +
-                showItem(getItemById(currentItem.linkId))
+                pathString(getItemById(currentItem.linkId))
                 }}
               </v-list-item-subtitle>
             </div>
@@ -157,7 +135,7 @@
                         ? ' -> ' + showItem(getItemById(item.linkId))
                         : '')
                     "
-                    @click="selectItem(item, true)"
+                    @click="selectItem(item)"
                   ></div>
                   <v-list-item-subtitle
                     v-if="childrenString(item) !== ''"
@@ -167,9 +145,33 @@
 
                 <!-- Löschen -->
                 <v-list-item-action>
-                  <v-btn icon>
-                    <v-icon v-if="!item.deleted" small @click="deleteItem(item)">mdi-delete</v-icon>
-                  </v-btn>
+                  <v-menu>
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-btn icon v-bind="attrs" v-on="on">
+                        <v-icon>mdi-dots-vertical</v-icon>
+                      </v-btn>
+                    </template>
+                    <v-list>
+                      <v-list-item>
+                        <v-icon small @click="moveItemUp(item)">mdi-arrow-up</v-icon>
+                      </v-list-item>
+                      <v-list-item>
+                        <v-icon small @click="moveItemDown(item)">mdi-arrow-down</v-icon>
+                      </v-list-item>
+                      <v-list-item v-if="!item.deleted">
+                        <v-icon small @click="cutItem(item)">mdi-content-cut</v-icon>
+                      </v-list-item>
+                      <v-list-item v-if="!item.deleted">
+                        <v-icon small @click="modifyItem(item)">mdi-pencil</v-icon>
+                      </v-list-item>
+                      <v-list-item v-if="!item.deleted">
+                        <v-icon small @click="deleteItem(item)">mdi-delete</v-icon>
+                      </v-list-item>
+                      <v-list-item v-if="item.deleted">
+                        <v-icon small @click="restoreItem(item)">mdi-restore</v-icon>
+                      </v-list-item>
+                    </v-list>
+                  </v-menu>
                 </v-list-item-action>
               </v-list-item>
 
@@ -665,10 +667,8 @@ export default {
     pathString (item) {
       let path = ''
       this.pathArray(item).forEach((i) => {
-        if (path !== '') {
-          path += ' > '
-        }
         path += i.name
+        path += ' > '
       })
       path += this.isNull(item.name)
       return path
@@ -696,33 +696,21 @@ export default {
         return []
       }
     },
-    selectItem (item, fromList) {
-      if (!fromList || (this.selectedItem && this.selectedItem === item) || item.unread) {
-        if (this.currentItem) {
-          if (
-            this.currentItem !== this.navigateList[this.navigateList.length - 1]
-          ) {
-            this.navigateList.push(this.currentItem)
-          }
-        } else {
-          this.navigateList.push(null)
-        }
-        if (item && item.linkId && !item.name) {
-          this.currentItem = this.getItemById(item.linkId)
-        } else {
-          this.currentItem = item
-          // this.$refs.inputName.focus()
-        }
-        this.selectedItem = null
-        // this.selIndex = null
-        if (item && item.unread) {
-          delete item.unread
-          this.storeData()
+    selectItem (item) {
+      if (this.currentItem) {
+        if (
+          this.currentItem !== this.navigateList[this.navigateList.length - 1]
+        ) {
+          this.navigateList.push(this.currentItem)
         }
       } else {
-        this.selectedItem = item
+        this.navigateList.push(null)
       }
-      // this.selIndex = null
+      this.currentItem = item
+      if (item && item.unread) {
+        delete item.unread
+        this.storeData()
+      }
     },
     getItemById (id) {
       return this.myData.find((i) => i.id === id)
@@ -798,10 +786,11 @@ export default {
       this.newItemName = ''
       this.save(this.editedItem)
     },
-    modifyItem () {
-      this.editedItem = { ...this.selectedItem }
+    modifyItem (item) {
+      this.editedItem = { ...item }
     },
-    moveItemUp () {
+    moveItemUp (item) {
+      this.selectedItem = item
       const posBefore = this.currentItems()[this.selectedIndex() - 1].pos
       let posBeforeBefore = 0
       if (this.selectedIndex() > 1) {
@@ -814,7 +803,8 @@ export default {
       this.resetSelectedItem()
       this.selIndex -= 1
     },
-    moveItemDown () {
+    moveItemDown (item) {
+      this.selectedItem = item
       const posNext = this.currentItems()[this.selectedIndex() + 1].pos
       if (this.selectedIndex() + 2 === this.currentItems().length) {
         this.selectedItem.pos = posNext + 1
@@ -826,12 +816,12 @@ export default {
       this.resetSelectedItem()
       this.selIndex += 1
     },
-    cutItem () {
-      this.cutedItem = { ...this.selectedItem }
-      this.myData.splice(this.myData.indexOf(this.selectedItem), 1)
+    cutItem (item) {
+      this.cutedItem = { ...item }
+      this.myData.splice(this.myData.indexOf(item), 1)
     },
     copyItem () {
-      this.copiedItem = { ...this.selectedItem }
+      this.copiedItem = { ...this.currentItem }
     },
     deleteItem (item) {
       this.selectedItem = item
@@ -840,8 +830,8 @@ export default {
       this.selectedItem = null
       this.selIndex = null
     },
-    restoreItem () {
-      this.selectedItem.deleted = false
+    restoreItem (item) {
+      item.deleted = false
       this.save(this.selectedItem)
     },
     pasteItem () {
@@ -918,11 +908,6 @@ export default {
             .collection('data')
             .doc(item.id)
             .set(cloudItem)
-          /*
-          .then((ref) => {
-            console.log('Added doc with ID: ', ref.id)
-          })
-          */
         }
 
         this.storeData()
