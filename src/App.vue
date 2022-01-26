@@ -99,6 +99,7 @@
               >
                 {{
                   getDate(currentItem.timeStamp).toLocaleDateString() + (currentItem.user ? ' ' + currentItem.user : '')
+                  + (currentItem.date ? ', Termin: ' + new Date(currentItem.date).toLocaleDateString() + ' ' + this.isNull(currentItem.responsible) : '')
                 }}
               </v-list-item-subtitle>
               <v-list-item-subtitle
@@ -112,8 +113,30 @@
               </v-list-item-subtitle>
             </div>
 
-            <!-- Liste -->
             <div v-if="!editedItem">
+
+              <!-- Terminliste -->
+              <v-list v-if="dateList().length > 0">
+                <v-list-group
+                  prepend-icon="mdi-calendar"
+                >
+                  <template v-slot:activator>
+                    <v-list-item-title>Termine</v-list-item-title>
+                  </template>
+                  <v-list-item v-for="(item, i) in dateList()" :key="i">
+                    <v-list-item-icon/>
+                    <v-list-item-content  @click="selectItem(item)">
+                      <v-list-item-title>
+                        {{ new Date(item.date).toLocaleDateString() }}
+                      </v-list-item-title>
+                      <v-list-item-subtitle>
+                        {{ pathString(item) }}
+                      </v-list-item-subtitle>
+                    </v-list-item-content>
+                  </v-list-item>
+                </v-list-group>
+              </v-list>
+
               <v-list-item v-for="(item, i) in currentItems()" :key="i">
                 <v-list-item-icon>
                   <v-icon v-if="item.toCloud" small>mdi-cloud</v-icon>
@@ -190,11 +213,21 @@
               </v-list-item>
             </div>
 
-            <form v-if="editedItem" class="mt-4">
+            <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
               <v-text-field v-model="editedItem.name" label="Bezeichnung"></v-text-field>
               <v-text-field v-model="numberEdit" label="Zahl oder Formel"></v-text-field>
               <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
+              <v-text-field
+                v-model="editedItem.date"
+                hide-details
+                label="Termin"
+                type="date"
+              />
+              <v-text-field
+                v-model="editedItem.responsible"
+                label="Zuständig"
+              />
               <v-autocomplete
                 v-model="editedItem.linkId"
                 :items="
@@ -207,7 +240,7 @@
                 label="Verknüpfung"
               ></v-autocomplete>
               <v-checkbox v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
-            </form>
+            </v-form>
           </v-list-item-group>
         </v-list>
 
@@ -335,117 +368,6 @@ export default {
     this.setPosToItems(null)
   },
   methods: {
-    displayNotification (msg) {
-      Notification.requestPermission(function (status) {
-        console.log('Notification permission status:', status)
-      })
-      if (Notification.permission === 'granted') {
-        /*
-        navigator.addEventListener('explore', function () {
-          window.open('https://www.myinfo24.web.app')
-        })
-        */
-        navigator.serviceWorker.getRegistration()
-          .then(function (reg) {
-            if (reg === undefined) {
-              console.log('only works online')
-              return
-            }
-            var options = {
-              body: msg,
-              icon: './static/img/notification-flat.png',
-              vibrate: [100, 50, 100],
-              data: {
-                dateOfArrival: Date.now(),
-                primaryKey: 1
-              },
-              actions: [
-                {
-                  action: 'explore',
-                  title: 'App öffnen',
-                  icon: './static/img/checkmark.png'
-                },
-                {
-                  action: 'close',
-                  title: 'Schließen',
-                  icon: './static/img/xmark.png'
-                }
-              ]
-            }
-            reg.showNotification('myinfo24', options)
-          })
-      }
-    },
-    setPosToItems (parent) {
-      let items
-      if (parent) {
-        items = this.myData.filter(
-          (i) => i.parentId === parent.id
-        )
-      } else {
-        items = this.myData.filter((i) => !i.parentId)
-      }
-      for (let index = 0; index < items.length; index++) {
-        if (!items[index].pos) {
-          items[index].pos = index + 1
-          this.save(items[index])
-          this.setPosToItems(items[index])
-        }
-      }
-    },
-    updateAvailable (event) {
-      this.registration = event.detail
-      this.updateExists = true
-    },
-    refreshApp () {
-      this.updateExists = false
-      // Make sure we only send a 'skip waiting' message if the SW is waiting
-      if (!this.registration || !this.registration.waiting) return
-      // Send message to SW to skip the waiting and activate the new SW
-      this.registration.waiting.postMessage({ type: 'SKIP_WAITING' })
-    },
-    async getFromFirestore () {
-      var dataRef = await firebase
-        .firestore()
-        .collection('data')
-
-      dataRef.onSnapshot(snap => {
-        this.cloudItems = []
-        snap.forEach(doc => {
-          const item = doc.data()
-          item.id = doc.id
-          this.cloudItems.push(item)
-        })
-        this.myData.forEach(item => {
-          const cloudItem = this.cloudItems.find(i => item.id === i.id)
-          if (cloudItem) {
-            this.itemTreeToMyData(cloudItem)
-          }
-        })
-
-        // Hilfe hinzufügen
-        const helpItem = this.cloudItems.find(i => i.id === '2021-11-16T18:27:35.008Z')
-        this.itemTreeToMyData(helpItem)
-
-        if (this.$route.query.id) {
-          const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === this.$route.query.id)
-          if (cloudItem) {
-            this.itemTreeToMyData(cloudItem)
-            this.storeData()
-          }
-          this.currentItem = this.getItemById(this.$route.query.id)
-        }
-      })
-    },
-    itemTreeToMyData (item) {
-      item.toCloud = true
-      this.setItemToMyData(item, false)
-      this.cloudItems
-        .filter((i) => i.parentId === item.id)
-        .forEach((child) => {
-          this.itemTreeToMyData(child)
-        })
-    },
     shownData () {
       if (this.withDeletedItems) {
         return this.myData
@@ -463,6 +385,12 @@ export default {
         items = this.shownData().filter((i) => !i.parentId)
       }
       return items.sort((a, b) => a.pos - b.pos)
+    },
+    // Terminliste
+    dateList () {
+      return this.myData.filter((i) => i.date && (!i.responsible || i.responsible === this.userName) &&
+        (!this.currentItem || this.pathArray(i).find(p => p.id === this.currentItem.id)))
+        .sort((a, b) => this.getDate(a.date) - this.getDate(b.date))
     },
     selectedIndex () {
       return this.currentItems().indexOf(this.selectedItem)
@@ -601,6 +529,117 @@ export default {
       } else {
         return baseValue
       }
+    },
+    displayNotification (msg) {
+      Notification.requestPermission(function (status) {
+        console.log('Notification permission status:', status)
+      })
+      if (Notification.permission === 'granted') {
+        /*
+        navigator.addEventListener('explore', function () {
+          window.open('https://www.myinfo24.web.app')
+        })
+        */
+        navigator.serviceWorker.getRegistration()
+          .then(function (reg) {
+            if (reg === undefined) {
+              console.log('only works online')
+              return
+            }
+            var options = {
+              body: msg,
+              icon: './static/img/notification-flat.png',
+              vibrate: [100, 50, 100],
+              data: {
+                dateOfArrival: Date.now(),
+                primaryKey: 1
+              },
+              actions: [
+                {
+                  action: 'explore',
+                  title: 'App öffnen',
+                  icon: './static/img/checkmark.png'
+                },
+                {
+                  action: 'close',
+                  title: 'Schließen',
+                  icon: './static/img/xmark.png'
+                }
+              ]
+            }
+            reg.showNotification('myinfo24', options)
+          })
+      }
+    },
+    setPosToItems (parent) {
+      let items
+      if (parent) {
+        items = this.myData.filter(
+          (i) => i.parentId === parent.id
+        )
+      } else {
+        items = this.myData.filter((i) => !i.parentId)
+      }
+      for (let index = 0; index < items.length; index++) {
+        if (!items[index].pos) {
+          items[index].pos = index + 1
+          this.save(items[index])
+          this.setPosToItems(items[index])
+        }
+      }
+    },
+    updateAvailable (event) {
+      this.registration = event.detail
+      this.updateExists = true
+    },
+    refreshApp () {
+      this.updateExists = false
+      // Make sure we only send a 'skip waiting' message if the SW is waiting
+      if (!this.registration || !this.registration.waiting) return
+      // Send message to SW to skip the waiting and activate the new SW
+      this.registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+    },
+    async getFromFirestore () {
+      var dataRef = await firebase
+        .firestore()
+        .collection('data')
+
+      dataRef.onSnapshot(snap => {
+        this.cloudItems = []
+        snap.forEach(doc => {
+          const item = doc.data()
+          item.id = doc.id
+          this.cloudItems.push(item)
+        })
+        this.myData.forEach(item => {
+          const cloudItem = this.cloudItems.find(i => item.id === i.id)
+          if (cloudItem) {
+            this.itemTreeToMyData(cloudItem)
+          }
+        })
+
+        // Hilfe hinzufügen
+        const helpItem = this.cloudItems.find(i => i.id === '2021-11-16T18:27:35.008Z')
+        this.itemTreeToMyData(helpItem)
+
+        if (this.$route.query.id) {
+          const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === this.$route.query.id)
+          if (cloudItem) {
+            this.itemTreeToMyData(cloudItem)
+            this.storeData()
+          }
+          this.currentItem = this.getItemById(this.$route.query.id)
+        }
+      })
+    },
+    itemTreeToMyData (item) {
+      item.toCloud = true
+      this.setItemToMyData(item, false)
+      this.cloudItems
+        .filter((i) => i.parentId === item.id)
+        .forEach((child) => {
+          this.itemTreeToMyData(child)
+        })
     },
     searchItem () {
       if (this.searchText.substring(0, 3) === 'id:') {
@@ -901,7 +940,7 @@ export default {
           const cloudItem = { ...item }
           delete cloudItem.toCloud
           delete cloudItem.id
-          cloudItem.user = this.userName
+          cloudItem.user = this.userName.trim()
 
           firebase
             .firestore()
@@ -920,7 +959,7 @@ export default {
     storeData () {
       localStorage.setItem('myinfo24-data', JSON.stringify(this.myData))
       if (this.userName) {
-        localStorage.setItem('myinfo24-userName', this.userName)
+        localStorage.setItem('myinfo24-userName', this.userName.trim())
       }
     },
     download () {

@@ -4,6 +4,9 @@ import vuetify from './plugins/vuetify'
 import './registerServiceWorker'
 import router from './router'
 import firebase from 'firebase/app'
+import DatetimePicker from 'vuetify-datetime-picker'
+
+Vue.use(DatetimePicker)
 
 Vue.config.productionTip = false
 
