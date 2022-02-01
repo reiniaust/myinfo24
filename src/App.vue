@@ -168,6 +168,10 @@
 
                 <!-- Löschen -->
                 <v-list-item-action>
+                  <v-icon small @click="deleteItem(item)">mdi-delete</v-icon>
+                </v-list-item-action>
+
+                <v-list-item-action>
                   <v-menu>
                     <template v-slot:activator="{ on, attrs }">
                       <v-btn icon v-bind="attrs" v-on="on">
@@ -186,9 +190,6 @@
                       </v-list-item>
                       <v-list-item v-if="!item.deleted">
                         <v-icon small @click="modifyItem(item)">mdi-pencil</v-icon>
-                      </v-list-item>
-                      <v-list-item v-if="!item.deleted">
-                        <v-icon small @click="deleteItem(item)">mdi-delete</v-icon>
                       </v-list-item>
                       <v-list-item v-if="item.deleted">
                         <v-icon small @click="restoreItem(item)">mdi-restore</v-icon>
@@ -239,7 +240,7 @@
                 item-text="name"
                 label="Verknüpfung"
               ></v-autocomplete>
-              <v-checkbox v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
+              <v-checkbox v-if="!itemHasChildrenInCloud(editedItem)" v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
             </v-form>
           </v-list-item-group>
         </v-list>
@@ -361,6 +362,9 @@ export default {
     }
     if (localStorage.getItem('myinfo24-userName') !== null) {
       this.userName = localStorage.getItem('myinfo24-userName')
+      if (this.userName === null) {
+        this.userName = ''
+      }
     }
 
     this.getFromFirestore()
@@ -388,7 +392,7 @@ export default {
     },
     // Terminliste
     dateList () {
-      return this.myData.filter((i) => i.date && (!i.responsible || i.responsible === this.userName) &&
+      return this.shownData().filter((i) => i.date && (!i.responsible || i.responsible === this.userName) &&
         (!this.currentItem || this.pathArray(i).find(p => p.id === this.currentItem.id)))
         .sort((a, b) => this.getDate(a.date) - this.getDate(b.date))
     },
@@ -611,7 +615,7 @@ export default {
           item.id = doc.id
           this.cloudItems.push(item)
         })
-        this.myData.forEach(item => {
+        this.myData.filter(i => i.toCloud).forEach(item => {
           const cloudItem = this.cloudItems.find(i => item.id === i.id)
           if (cloudItem) {
             this.itemTreeToMyData(cloudItem)
@@ -641,12 +645,22 @@ export default {
           this.itemTreeToMyData(child)
         })
     },
+    itemHasChildrenInCloud (item) {
+      return item.id ? this.cloudItems.find(i => i.parentId === item.id) : null
+    },
     searchItem () {
-      if (this.searchText.substring(0, 3) === 'id:') {
+      if (this.searchText.substring(0, 4) === 'ID: ') {
         const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === i.id)
         if (cloudItem) {
           this.searchText = ''
           this.itemTreeToMyData(cloudItem)
+
+          let item = { ...cloudItem }
+          while (item.parentId) {
+            item = this.cloudItems.find((i) => i.id === item.parentId)
+            this.setItemToMyData(item)
+          }
+
           this.storeData()
         }
       } else {
@@ -863,15 +877,17 @@ export default {
       this.copiedItem = { ...this.currentItem }
     },
     deleteItem (item) {
-      this.selectedItem = item
-      this.selectedItem.deleted = true
-      this.save(this.selectedItem)
-      this.selectedItem = null
-      this.selIndex = null
+      if (item.toCloud && !item.parentId) {
+        this.myData.splice(this.myData.indexOf(item), 1)
+        this.storeData()
+      } else {
+        item.deleted = true
+        this.save(item)
+      }
     },
     restoreItem (item) {
       item.deleted = false
-      this.save(this.selectedItem)
+      this.save(item)
     },
     pasteItem () {
       let item
@@ -907,7 +923,7 @@ export default {
       }
     },
     save (item) {
-      if (item.toCloud && !this.userName) {
+      if (item.toCloud && this.userName === '') {
         alert('Bitte deinen Benutzernamen eingeben.')
       } else {
         if (item.name && item.name.trim()) {
@@ -958,7 +974,7 @@ export default {
     },
     storeData () {
       localStorage.setItem('myinfo24-data', JSON.stringify(this.myData))
-      if (this.userName) {
+      if (this.userName !== '') {
         localStorage.setItem('myinfo24-userName', this.userName.trim())
       }
     },
