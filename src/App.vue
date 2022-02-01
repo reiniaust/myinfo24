@@ -138,14 +138,12 @@
               </v-list>
 
               <v-list-item v-for="(item, i) in currentItems()" :key="i">
-                <v-list-item-icon>
-                  <v-icon v-if="item.toCloud" small>mdi-cloud</v-icon>
-                </v-list-item-icon>
                 <v-list-item-content :class="item.unread ? 'font-weight-bold' : ''">
                   <div
                     color="primary"
                     :class="item.deleted ? 'text-decoration-line-through' : ''"
                     v-text="
+                      (item.toCloud ? '☁️ ' : '') +
                       isNull(item.name) +
                       ' ' +
                       numberDe(
@@ -200,9 +198,6 @@
               </v-list-item>
 
               <v-list-item>
-                <v-list-item-icon>
-                  <v-icon v-if="currentItem && currentItem.toCloud" small>mdi-cloud</v-icon>
-                </v-list-item-icon>
                 <v-list-item-content>
                   <v-text-field v-model="newItemName" label="Neuer Eintrag" @keydown="newItemNameKeydown"></v-text-field>
                 </v-list-item-content>
@@ -216,8 +211,8 @@
 
             <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
-              <v-textarea v-model="editedItem.name" label="Text"></v-textarea>
-              <v-text-field v-model="numberEdit" label="Zahl oder Formel"></v-text-field>
+              <v-textarea v-model="editedItem.name" label="Inhalt"></v-textarea>
+              <v-text-field v-model="numberEdit" label="Zahl oder Ausdruck (z.B. 1,5 * 3)"></v-text-field>
               <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
               <v-text-field
                 v-model="editedItem.date"
@@ -241,6 +236,7 @@
                 label="Verknüpfung"
               ></v-autocomplete>
               <v-checkbox v-if="!itemHasChildrenInCloud(editedItem)" v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
+              <v-checkbox v-if="editedItem.toCloud" v-model="sendNotification" label="Andere benachrichtigen"></v-checkbox>
             </v-form>
           </v-list-item-group>
         </v-list>
@@ -281,6 +277,7 @@ export default {
     newItemName: '',
     editedItem: null,
     userName: '',
+    sendNotification: false,
     cutedItem: null,
     copiedItem: null,
     downloaded: false,
@@ -923,7 +920,7 @@ export default {
       }
     },
     save (item) {
-      if (item.toCloud && this.userName === '') {
+      if (item.toCloud && (this.userName === '' || !this.userName || this.userName === 'null')) {
         alert('Bitte deinen Benutzernamen eingeben.')
       } else {
         if (item.name && item.name.trim()) {
@@ -957,6 +954,9 @@ export default {
           delete cloudItem.toCloud
           delete cloudItem.id
           cloudItem.user = this.userName.trim()
+          if (this.sendNotification) {
+            cloudItem.sendNotification = true
+          }
 
           firebase
             .firestore()
@@ -974,9 +974,6 @@ export default {
     },
     storeData () {
       localStorage.setItem('myinfo24-data', JSON.stringify(this.myData))
-      if (this.userName !== '') {
-        localStorage.setItem('myinfo24-userName', this.userName.trim())
-      }
     },
     download () {
       // credit: https://www.bitdegree.org/learn/javascript-download
@@ -1050,8 +1047,10 @@ export default {
         if (!fromSave) {
           if (item.user && item.user !== this.userName) {
             item.unread = true
+            if (item.sendNotification) {
+              this.displayNotification(item.user + ': ' + this.showItem(item))
+            }
           }
-          this.displayNotification(item.user + ': ' + this.showItem(item))
         }
         this.myData.push(item)
       } else {
