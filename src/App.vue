@@ -216,7 +216,7 @@
 
             <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
-              <v-text-field v-model="editedItem.name" label="Bezeichnung"></v-text-field>
+              <v-textarea v-model="editedItem.name" label="Text"></v-textarea>
               <v-text-field v-model="numberEdit" label="Zahl oder Formel"></v-text-field>
               <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
               <v-text-field
