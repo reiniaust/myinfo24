@@ -8,15 +8,12 @@
     </v-snackbar>
     <v-app-bar app color="primary" dark>
       <v-btn
-        :disabled="navigateList.length === 0 && !selectedItem  && !editedItem && !searchVisible"
+        :disabled="navigateList.length === 0 && !selectedItem  && !editedItem"
         text
         small
         @click="goBack"
       >
         <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
-      <v-btn v-if="!editedItem && !selectedItem && !searchVisible" text small @click="searchVisible=true">
-        <v-icon>mdi-magnify</v-icon>
       </v-btn>
       <v-btn v-if="!editedItem && !selectedItem" text small @click="setNewItem">
         <v-icon>mdi-plus</v-icon>
@@ -69,8 +66,8 @@
 
     <v-main class="ma-8">
       <div class="mb-2">
-        <v-row v-if="searchVisible">
-          <v-text-field v-model="searchText" label="Suche"></v-text-field>
+        <v-row>
+          <v-text-field v-model="searchText" label="Suche" @keydown="searchInputKeydown"></v-text-field>
           <v-btn text @click="searchItem">
             <v-icon>mdi-arrow-right</v-icon>
           </v-btn>
@@ -118,10 +115,9 @@
               <!-- Terminliste -->
               <v-list v-if="dateList().length > 0">
                 <v-list-group
-                  prepend-icon="mdi-calendar"
                 >
                   <template v-slot:activator>
-                    <v-list-item-title>Termine</v-list-item-title>
+                    <v-list-item-title>📅 Termine</v-list-item-title>
                   </template>
                   <v-list-item v-for="(item, i) in dateList()" :key="i">
                     <v-list-item-icon/>
@@ -211,7 +207,7 @@
 
             <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
-              <v-textarea v-model="editedItem.name" label="Inhalt"></v-textarea>
+              <v-textarea v-model="editedItem.name" label="Inhalt" rows="3"></v-textarea>
               <v-text-field v-model="numberEdit" label="Zahl oder Ausdruck (z.B. 1,5 * 3)"></v-text-field>
               <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
               <v-text-field
@@ -282,7 +278,6 @@ export default {
     copiedItem: null,
     downloaded: false,
     navigateList: [],
-    searchVisible: false,
     searchText: '',
     searchTextOld: '',
     searchIndex: 0,
@@ -645,6 +640,11 @@ export default {
     itemHasChildrenInCloud (item) {
       return item.id ? this.cloudItems.find(i => i.parentId === item.id) : null
     },
+    searchInputKeydown (e) {
+      if (e.code === 'Enter') {
+        this.searchItem()
+      }
+    },
     searchItem () {
       if (this.searchText.substring(0, 4) === 'ID: ') {
         const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === i.id)
@@ -761,6 +761,7 @@ export default {
         delete item.unread
         this.storeData()
       }
+      this.searchText = ''
     },
     getItemById (id) {
       return this.myData.find((i) => i.id === id)
@@ -787,7 +788,6 @@ export default {
         this.navigateList.splice(len - 1, 1)
       }
       this.selIndex = null
-      this.searchVisible = false
       this.newItemName = ''
     },
     setNewItem () {
@@ -1046,10 +1046,7 @@ export default {
       if (!foundItem) {
         if (!fromSave) {
           if (item.user && item.user !== this.userName) {
-            item.unread = true
-            if (item.sendNotification) {
-              this.displayNotification(item.user + ': ' + this.showItem(item))
-            }
+            setUnreadAndNotification()
           }
         }
         this.myData.push(item)
@@ -1057,13 +1054,8 @@ export default {
         if (fromSave || (foundItem.timeStamp && this.getDate(foundItem.timeStamp) < this.getDate(item.timeStamp))) {
           if (!fromSave) {
             if (item.user && item.user !== this.userName) {
-              item.unread = true
+              setUnreadAndNotification()
             }
-            /*
-            if (item.deleted) {
-              this.withDeletedItems = true
-            }
-            */
           }
           Object.assign(foundItem, item)
         }
@@ -1072,6 +1064,13 @@ export default {
         this.pathArray(item).forEach((i) => {
           i.unread = true
         })
+      }
+
+      function setUnreadAndNotification () {
+        item.unread = true
+        if (item.sendNotification) {
+          this.displayNotification(item.user + ': ' + this.showItem(item))
+        }
       }
     },
     getUnitByName (unitName) {

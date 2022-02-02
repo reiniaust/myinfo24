@@ -2,7 +2,6 @@ import Vue from 'vue'
 import App from './App.vue'
 import vuetify from './plugins/vuetify'
 import './registerServiceWorker'
-import router from './router'
 import firebase from 'firebase/app'
 import DatetimePicker from 'vuetify-datetime-picker'
 
@@ -23,6 +22,5 @@ firebase.initializeApp(firebaseConfig)
 
 new Vue({
   vuetify,
-  router,
   render: h => h(App)
 }).$mount('#app')
