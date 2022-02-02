@@ -207,8 +207,8 @@
 
             <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
-              <v-textarea v-model="editedItem.name" label="Inhalt" rows="3"></v-textarea>
-              <v-text-field v-model="numberEdit" label="Zahl oder Ausdruck (z.B. 1,5 * 3)"></v-text-field>
+              <v-textarea v-model="editedItem.name" label="Inhalt" autofocus rows="3"></v-textarea>
+              <v-text-field v-model="numberEdit" label="Zahl oder Ausdruck (z.B. 1,5 * 3)" @keydown="editFormKeydown"></v-text-field>
               <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
               <v-text-field
                 v-model="editedItem.date"
@@ -610,7 +610,7 @@ export default {
         this.myData.filter(i => i.toCloud).forEach(item => {
           const cloudItem = this.cloudItems.find(i => item.id === i.id)
           if (cloudItem) {
-            this.itemTreeToMyData(cloudItem)
+            this.setCloudItemToMydata(cloudItem)
           }
         })
 
@@ -621,7 +621,7 @@ export default {
         if (this.$route.query.id) {
           const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === this.$route.query.id)
           if (cloudItem) {
-            this.itemTreeToMyData(cloudItem)
+            this.setCloudItemToMydata(cloudItem)
             this.storeData()
           }
           this.currentItem = this.getItemById(this.$route.query.id)
@@ -650,13 +650,8 @@ export default {
         const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === i.id)
         if (cloudItem) {
           this.searchText = ''
-          this.itemTreeToMyData(cloudItem)
 
-          let item = { ...cloudItem }
-          while (item.parentId) {
-            item = this.cloudItems.find((i) => i.id === item.parentId)
-            this.setItemToMyData(item)
-          }
+          this.setCloudItemToMydata(cloudItem)
 
           this.storeData()
         }
@@ -919,6 +914,11 @@ export default {
         })
       }
     },
+    editFormKeydown (e) {
+      if (e.code === 'Enter') {
+        this.save(this.editedItem)
+      }
+    },
     save (item) {
       if (item.toCloud && (this.userName === '' || !this.userName || this.userName === 'null')) {
         alert('Bitte deinen Benutzernamen eingeben.')
@@ -1016,6 +1016,16 @@ export default {
           data.push(child)
           this.addChildrenToData(data, child)
         })
+    },
+    setCloudItemToMydata (cloudItem) {
+      this.itemTreeToMyData(cloudItem)
+
+      // Beim Einfügen aus der Cloud die Oberpunkte dazu nehmen
+      let item = { ...cloudItem }
+      while (item.parentId) {
+        item = this.cloudItems.find((i) => i.id === item.parentId)
+        this.setItemToMyData(item)
+      }
     },
     onPickFile () {
       this.$refs.fileInput.click()
