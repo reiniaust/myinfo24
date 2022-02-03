@@ -142,11 +142,14 @@
                   <v-list-item v-for="(item, i) in dateList()" :key="i">
                     <v-list-item-icon/>
                     <v-list-item-content  @click="selectItem(item)">
-                      <v-list-item-title>
+                      <b v-if="new Date(item.date) <= new Date()">
                         {{ new Date(item.date).toLocaleDateString() }}
-                      </v-list-item-title>
+                      </b>
+                      <div v-else>
+                        {{ new Date(item.date).toLocaleDateString() }}
+                      </div>
                       <v-list-item-subtitle>
-                        {{ pathString(item) }}
+                        {{ pathStringForDate(item) }}
                       </v-list-item-subtitle>
                     </v-list-item-content>
                   </v-list-item>
@@ -745,6 +748,20 @@ export default {
       this.pathArray(item).forEach((i) => {
         path += i.name
         path += ' > '
+      })
+      path += this.isNull(item.name)
+      return path
+    },
+    pathStringForDate (item) {
+      let path = null
+      this.pathArray(item).forEach((i) => {
+        if (path === null && (!this.currentItem || i === this.currentItem)) {
+          path = ''
+        }
+        if (path !== null && (!this.currentItem || i !== this.currentItem)) {
+          path += i.name
+          path += ' > '
+        }
       })
       path += this.isNull(item.name)
       return path
