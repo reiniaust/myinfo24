@@ -15,8 +15,11 @@
       >
         <v-icon>mdi-arrow-left</v-icon>
       </v-btn>
-      <v-btn v-if="!editedItem && !selectedItem" text small @click="setNewItem">
+      <v-btn v-if="!editedItem" text small @click="setNewItem">
         <v-icon>mdi-plus</v-icon>
+      </v-btn>
+      <v-btn v-if="currentItem && !editedItem" text small @click="modifyItem(currentItem)">
+        <v-icon>mdi-pencil</v-icon>
       </v-btn>
       <v-btn v-if="editedItem" text small @click="save(editedItem)">
         <v-icon>mdi-content-save</v-icon>
@@ -87,7 +90,6 @@
         <v-list>
           <v-list-item-group
             v-model="selIndex"
-            color="primary"
           >
             <div v-if="!(editedItem && editedItem.id)" class="mb-2">
               <h3>{{ currentItem ? showItem(currentItem) : "Home" }}</h3>
@@ -215,10 +217,12 @@
                 hide-details
                 label="Termin"
                 type="date"
+                @keydown="editFormKeydown"
               />
               <v-text-field
                 v-model="editedItem.responsible"
                 label="Zuständig"
+                @keydown="editFormKeydown"
               />
               <v-autocomplete
                 v-model="editedItem.linkId"
@@ -362,6 +366,10 @@ export default {
     this.getFromFirestore()
 
     this.setPosToItems(null)
+
+    setInterval(() => {
+      this.dateNotification()
+    }, 60000)
   },
   methods: {
     shownData () {
@@ -384,9 +392,15 @@ export default {
     },
     // Terminliste
     dateList () {
-      return this.shownData().filter((i) => i.date && (!i.responsible || i.responsible === this.userName) &&
+      return this.shownData().filter((i) => i.date && (!i.responsible || i.responsible.toUpperCase().includes(this.userName.toUpperCase())) &&
         (!this.currentItem || this.pathArray(i).find(p => p.id === this.currentItem.id)))
         .sort((a, b) => this.getDate(a.date) - this.getDate(b.date))
+    },
+    dateNotification () {
+      this.dateList().filter(i => !i.dateNotified && this.getDate(i.date) <= new Date()).forEach(item => {
+        item.dateNotified = true
+        this.displayNotification(this.showItem(item))
+      })
     },
     selectedIndex () {
       return this.currentItems().indexOf(this.selectedItem)
@@ -399,81 +413,78 @@ export default {
       let divisorUnit = null
       let divisor = 1
       let percent = 100
-      if (parentItem.unit && parentItem.unit.includes('/')) {
+      if (parentItem) {
+        if (parentItem.unit && parentItem.unit.includes('/')) {
         // wenn Einheit z.B. Eur/st
-        multiplierUnit = this.getUnitByName(this.baseUnit(parentItem.unit).split('/')[0])
-        divisorUnit = this.getUnitByName(this.baseUnit(parentItem.unit).split('/')[1])
-      }
+          multiplierUnit = this.getUnitByName(this.baseUnit(parentItem.unit).split('/')[0])
+          divisorUnit = this.getUnitByName(this.baseUnit(parentItem.unit).split('/')[1])
+        }
 
-      const items = this.shownData().filter(
-        (i) => i.parentId === parentItem.id
-      )
+        const items = this.shownData().filter(
+          (i) => i.parentId === parentItem.id
+        )
 
-      if (items.length >= 1) {
-        if (
-          items.filter(
-            (i) => this.baseUnit(i.unit) === this.baseUnit(parentItem.unit)
-          ).length === items.length
-        ) {
-          items.forEach(
-            (i) => (calcValue += parseFloat(this.baseValue(i.unit, this.calculatedValue(i))))
-          )
-        } else {
-          if (parentItem.unit) {
-            items.forEach((item) => {
-              if (item.linkId) {
-                item = this.getItemById(item.linkId)
-              }
-              if (item && item.unit) {
-                const unit = this.getUnitByName(this.baseUnit(item.unit))
-                if (unit.name.includes('%')) {
-                  if (unit.name.includes('Aufschlag')) {
-                  // eslint-disable-next-line no-eval
-                    percent = eval(item.value) + 100
-                  } else {
-                    percent = item.value
-                  }
-                } else {
-                // eslint-disable-next-line no-eval
-                  const value = this.baseValue(item.unit, eval(this.calculatedValue(item)))
-                  if (parentItem.unit && parentItem.unit.includes('/')) {
-                    if (unit.base.split('/')[0] === multiplierUnit.name) {
-                      multiplier1 = value // * unit.value
-                    }
-                    if (unit.base.includes('/') && unit.base.split('/')[1] === divisorUnit.name) {
-                      multiplier2 = value
+        if (items.length >= 1) {
+          if (
+            items.filter(
+              (i) => this.baseUnit(i.unit) === this.baseUnit(parentItem.unit)
+            ).length === items.length
+          ) {
+            items.forEach(
+              (i) => (calcValue += parseFloat(this.baseValue(i.unit, this.calculatedValue(i))))
+            )
+          } else {
+            if (parentItem.unit) {
+              items.forEach((item) => {
+                if (item.linkId) {
+                  item = this.getItemById(item.linkId)
+                }
+                if (item && item.unit) {
+                  const unit = this.getUnitByName(this.baseUnit(item.unit))
+                  if (unit.name.includes('%')) {
+                    if (unit.name.includes('Aufschlag')) {
+                      // eslint-disable-next-line no-eval
+                      percent = eval(item.value) + 100
                     } else {
-                      if (unit.base.split('/')[0] === divisorUnit.name) {
-                        divisor = value // * unit.value
-                      }
+                      percent = item.value
                     }
                   } else {
-                    if (item.unit) {
-                      if (!item.unit.includes('/')) {
+                    // eslint-disable-next-line no-eval
+                    const value = this.baseValue(item.unit, eval(this.calculatedValue(item)))
+                    if (parentItem.unit && parentItem.unit.includes('/')) {
+                      if (unit.base.split('/')[0] === multiplierUnit.name) {
                         multiplier1 = value // * unit.value
                       }
-                      if (item.unit.includes('/')) {
-                        multiplier2 = value // * unit.value
+                      if (unit.base.includes('/') && unit.base.split('/')[1] === divisorUnit.name) {
+                        multiplier2 = value
+                      } else {
+                        if (unit.base.split('/')[0] === divisorUnit.name) {
+                          divisor = value // * unit.value
+                        }
+                      }
+                    } else {
+                      if (item.unit) {
+                        if (!item.unit.includes('/')) {
+                          multiplier1 = value // * unit.value
+                        }
+                        if (item.unit.includes('/')) {
+                          multiplier2 = value // * unit.value
+                        }
                       }
                     }
                   }
                 }
-              }
-            })
-            calcValue = (multiplier1 * multiplier2) / divisor
-            calcValue = calcValue * (percent / 100)
-            /*
-            calcValue =
-              (calcValue / this.getUnitByName(parentItem.unit).value) *
-              (percent / 100)
-            */
+              })
+              calcValue = (multiplier1 * multiplier2) / divisor
+              calcValue = calcValue * (percent / 100)
+            }
           }
         }
-      }
-      if (!calcValue) {
-        calcValue = parentItem.value
-      } else {
-        calcValue = this.originValue(parentItem.unit, calcValue)
+        if (!calcValue) {
+          calcValue = parentItem.value
+        } else {
+          calcValue = this.originValue(parentItem.unit, calcValue)
+        }
       }
 
       return calcValue
@@ -531,11 +542,6 @@ export default {
         console.log('Notification permission status:', status)
       })
       if (Notification.permission === 'granted') {
-        /*
-        navigator.addEventListener('explore', function () {
-          window.open('https://www.myinfo24.web.app')
-        })
-        */
         navigator.serviceWorker.getRegistration()
           .then(function (reg) {
             if (reg === undefined) {
@@ -762,15 +768,19 @@ export default {
       return this.myData.find((i) => i.id === id)
     },
     showItem (item) {
-      let value = this.isNull(this.calculatedValue(item))
-      if (this.isNumeric(this.calculatedValue(item))) {
-        value = this.numberDe(
-          Math.round(this.calculatedValue(item) * 1000) / 1000
+      if (item) {
+        let value = this.isNull(this.calculatedValue(item))
+        if (this.isNumeric(this.calculatedValue(item))) {
+          value = this.numberDe(
+            Math.round(this.calculatedValue(item) * 1000) / 1000
+          )
+        }
+        return (
+          this.isNull(item.name) + ' ' + value + ' ' + this.isNull(item.unit)
         )
+      } else {
+        return null
       }
-      return (
-        this.isNull(item.name) + ' ' + value + ' ' + this.isNull(item.unit)
-      )
     },
     goBack () {
       if (this.selectedItem || this.editedItem || this.cutedItem) {
@@ -1055,17 +1065,13 @@ export default {
       const foundItem = this.myData.find((i) => i.id === item.id)
       if (!foundItem) {
         if (!fromSave) {
-          if (item.user && item.user !== this.userName) {
-            setUnreadAndNotification()
-          }
+          this.setUnreadAndNotification(item)
         }
         this.myData.push(item)
       } else {
         if (fromSave || (foundItem.timeStamp && this.getDate(foundItem.timeStamp) < this.getDate(item.timeStamp))) {
           if (!fromSave) {
-            if (item.user && item.user !== this.userName) {
-              setUnreadAndNotification()
-            }
+            this.setUnreadAndNotification(item)
           }
           Object.assign(foundItem, item)
         }
@@ -1075,8 +1081,9 @@ export default {
           i.unread = true
         })
       }
-
-      function setUnreadAndNotification () {
+    },
+    setUnreadAndNotification (item) {
+      if (item.user && item.user !== this.userName) {
         item.unread = true
         if (item.sendNotification) {
           this.displayNotification(item.user + ': ' + this.showItem(item))
