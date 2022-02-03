@@ -96,10 +96,7 @@
               <v-list-item-subtitle
                 v-if="currentItem && currentItem.timeStamp"
               >
-                {{
-                  getDate(currentItem.timeStamp).toLocaleDateString() + (currentItem.user ? ' ' + currentItem.user : '')
-                  + (currentItem.date ? ', Termin: ' + new Date(currentItem.date).toLocaleDateString() + ' ' + this.isNull(currentItem.responsible) : '')
-                }}
+                {{ showItemAdditive(currentItem) }}
               </v-list-item-subtitle>
               <v-list-item-subtitle
                 v-if="currentItem && currentItem.linkId"
@@ -113,6 +110,27 @@
             </div>
 
             <div v-if="!editedItem">
+
+              <!-- Änderungsprotokoll -->
+              <v-list v-if="currentArchive().length > 0">
+                <v-list-group
+                >
+                  <template v-slot:activator>
+                    <v-list-item-title>📝 Protokoll</v-list-item-title>
+                  </template>
+                  <v-list-item v-for="(item, i) in currentArchive()" :key="i">
+                    <v-list-item-icon/>
+                    <v-list-item-content>
+                      <div>
+                        {{ showItem(item) }}
+                      </div>
+                      <v-list-item-subtitle>
+                        {{ showItemAdditive(item) }}
+                      </v-list-item-subtitle>
+                    </v-list-item-content>
+                  </v-list-item>
+                </v-list-group>
+              </v-list>
 
               <!-- Terminliste -->
               <v-list v-if="dateList().length > 0">
@@ -269,7 +287,7 @@ export default {
     updateExists: false,
     myData: [],
     cloudItems: null,
-    // items: null,
+    archiveItems: null,
     withDeletedItems: false,
     selectedItem: null,
     selIndex: null,
@@ -390,16 +408,20 @@ export default {
       }
       return items.sort((a, b) => a.pos - b.pos)
     },
+    currentArchive () {
+      return this.currentItem ? this.archiveItems.filter(i => i.id === this.currentItem.id) : []
+    },
     // Terminliste
     dateList () {
       return this.shownData().filter((i) => i.date && (!i.responsible || i.responsible.toUpperCase().includes(this.userName.toUpperCase())) &&
         (!this.currentItem || this.pathArray(i).find(p => p.id === this.currentItem.id)))
         .sort((a, b) => this.getDate(a.date) - this.getDate(b.date))
     },
+    // Termin-Nachricht
     dateNotification () {
       this.dateList().filter(i => !i.dateNotified && this.getDate(i.date) <= new Date()).forEach(item => {
         item.dateNotified = true
-        this.displayNotification(this.showItem(item))
+        this.displayNotification('Termin: ' + this.showItem(item))
       })
     },
     selectedIndex () {
@@ -602,9 +624,13 @@ export default {
       this.registration.waiting.postMessage({ type: 'SKIP_WAITING' })
     },
     async getFromFirestore () {
-      var dataRef = await firebase
+      const dataRef = await firebase
         .firestore()
         .collection('data')
+
+      const archiveRef = await firebase
+        .firestore()
+        .collection('archive')
 
       dataRef.onSnapshot(snap => {
         this.cloudItems = []
@@ -620,18 +646,17 @@ export default {
           }
         })
 
+        archiveRef.onSnapshot(snap => {
+          this.archiveItems = []
+          snap.forEach(doc => {
+            const item = doc.data()
+            this.archiveItems.push(item)
+          })
+        })
+
         // Hilfe hinzufügen
         const helpItem = this.cloudItems.find(i => i.id === '2021-11-16T18:27:35.008Z')
         this.itemTreeToMyData(helpItem)
-
-        if (this.$route.query.id) {
-          const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === this.$route.query.id)
-          if (cloudItem) {
-            this.setCloudItemToMydata(cloudItem)
-            this.storeData()
-          }
-          this.currentItem = this.getItemById(this.$route.query.id)
-        }
       })
     },
     itemTreeToMyData (item) {
@@ -781,6 +806,11 @@ export default {
       } else {
         return null
       }
+    },
+    // Gibt die Zusatz-Infos als String zurück
+    showItemAdditive (item) {
+      return this.getDate(item.timeStamp).toLocaleDateString() + (item.user ? ' ' + item.user : '') +
+        (item.date ? ', Termin: ' + new Date(item.date).toLocaleDateString() + ' ' + this.isNull(item.responsible) : '')
     },
     goBack () {
       if (this.selectedItem || this.editedItem || this.cutedItem) {
