@@ -185,7 +185,7 @@
 
                 <!-- Löschen -->
                 <v-list-item-action>
-                  <v-icon small @click="deleteItem(item)">mdi-delete</v-icon>
+                  <v-icon small @click="itemAction(itemActions[0], item)">{{ itemActions[0].icon }}</v-icon>
                 </v-list-item-action>
 
                 <v-list-item-action>
@@ -196,18 +196,11 @@
                       </v-btn>
                     </template>
                     <v-list>
-                      <v-list-item>
-                        <v-icon small @click="moveItemUp(item)">mdi-arrow-up</v-icon>
-                      </v-list-item>
-                      <v-list-item>
-                        <v-icon small @click="moveItemDown(item)">mdi-arrow-down</v-icon>
-                      </v-list-item>
-                      <v-list-item v-if="!item.deleted">
-                        <v-icon small @click="cutItem(item)">mdi-content-cut</v-icon>
-                      </v-list-item>
-                      <v-list-item v-if="!item.deleted">
-                        <v-icon small @click="modifyItem(item)">mdi-pencil</v-icon>
-                      </v-list-item>
+                      <div v-for="(itemAct, i) in itemActions" :key="i">
+                        <v-list-item v-if="i > 0">
+                          <v-icon small @click="itemAction(itemAct, item)">{{ itemAct.icon }}</v-icon>
+                        </v-list-item>
+                      </div>
                       <v-list-item v-if="item.deleted">
                         <v-icon small @click="restoreItem(item)">mdi-restore</v-icon>
                       </v-list-item>
@@ -306,6 +299,13 @@ export default {
     searchText: '',
     searchTextOld: '',
     searchIndex: 0,
+    itemActions: [
+      { action: 'delete', icon: 'mdi-delete' },
+      { action: 'moveUp', icon: 'mdi-arrow-up' },
+      { action: 'moveDown', icon: 'mdi-arrow-down' },
+      { action: 'cut', icon: 'mdi-content-cut' },
+      { action: 'modify', icon: 'mdi-pencil' }
+    ],
     units () {
       const units = [
         { name: '' },
@@ -924,6 +924,28 @@ export default {
     },
     copyItem () {
       this.copiedItem = { ...this.currentItem }
+    },
+    itemAction (itemAct, item) {
+      if (itemAct.action === 'delete') {
+        this.deleteItem(item)
+      }
+      if (itemAct.action === 'moveUp') {
+        this.moveItemUp(item)
+      }
+      if (itemAct.action === 'moveDown') {
+        this.moveItemDown(item)
+      }
+      if (itemAct.action === 'cut') {
+        this.cutItem(item)
+      }
+      if (itemAct.action === 'modify') {
+        this.modifyItem(item)
+      }
+      const index = this.itemActions.indexOf(itemAct)
+      if (index > 0) {
+        this.itemActions.splice(index, 1)
+        this.itemActions.unshift(itemAct)
+      }
     },
     deleteItem (item) {
       if (item.toCloud && !item.parentId) {
