@@ -240,14 +240,14 @@
               />
               <v-autocomplete
                 v-model="editedItem.linkId"
+                label="Verknüpfung"
                 :items="
                   myData.map((i) => {
-                    return { id: i.id, name: pathString(i) };
+                    return { id: i.id, name: pathStringReverse(i) };
                   })
                 "
                 item-value="id"
                 item-text="name"
-                label="Verknüpfung"
               ></v-autocomplete>
               <v-checkbox v-if="!itemHasChildrenInCloud(editedItem)" v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
               <v-checkbox v-if="editedItem.toCloud" v-model="sendNotification" label="Andere benachrichtigen"></v-checkbox>
@@ -306,8 +306,55 @@ export default {
       { action: 'cut', icon: 'mdi-content-cut' },
       { action: 'modify', icon: 'mdi-pencil' }
     ],
-    units () {
-      const units = [
+    units: null
+  }),
+  computed: {
+    numberEdit: {
+      get: function () {
+        return this.numberDe(this.editedItem.value)
+      },
+      set: function (newValue) {
+        this.editedItem.value = this.numberUs(newValue)
+      }
+    }
+  },
+  created () {
+    document.addEventListener('swUpdated', this.updateAvailable, { once: true })
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // We'll also need to add 'refreshing' to our data originally set to false.
+      if (this.refreshing) return
+      this.refreshing = true
+      // Here the actual reload of the page occurs
+      window.location.reload()
+    })
+  },
+  mounted () {
+    this.setUnits()
+
+    if (localStorage.getItem('myinfo24-data') !== null) {
+      this.myData = JSON.parse(localStorage.getItem('myinfo24-data'))
+      this.myData = this.myData.filter((i) => !(i === null)) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
+    } else {
+      this.myData = []
+    }
+    if (localStorage.getItem('myinfo24-userName') !== null) {
+      this.userName = localStorage.getItem('myinfo24-userName')
+      if (this.userName === null) {
+        this.userName = ''
+      }
+    }
+
+    this.getFromFirestore()
+
+    this.setPosToItems(null)
+
+    setInterval(() => {
+      this.dateNotification()
+    }, 60000)
+  },
+  methods: {
+    setUnits () {
+      this.units = [
         { name: '' },
         { name: 'Eur' },
         { name: 'ct', value: 0.01, base: 'Eur' },
@@ -331,9 +378,9 @@ export default {
         { name: '% Anteil' }
       ]
       const unitsPer = []
-      units.forEach((u1) => {
+      this.units.forEach((u1) => {
         if (!u1.name.includes('%') && u1.name !== '') {
-          units.forEach((u2) => {
+          this.units.forEach((u2) => {
             if (
               u1 !== u2 &&
               !u2.name.includes('%') &&
@@ -347,52 +394,8 @@ export default {
           })
         }
       })
-      return units.concat(unitsPer)
-    }
-  }),
-  computed: {
-    numberEdit: {
-      get: function () {
-        return this.numberDe(this.editedItem.value)
-      },
-      set: function (newValue) {
-        this.editedItem.value = this.numberUs(newValue)
-      }
-    }
-  },
-  created () {
-    document.addEventListener('swUpdated', this.updateAvailable, { once: true })
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // We'll also need to add 'refreshing' to our data originally set to false.
-      if (this.refreshing) return
-      this.refreshing = true
-      // Here the actual reload of the page occurs
-      window.location.reload()
-    })
-  },
-  mounted () {
-    if (localStorage.getItem('myinfo24-data') !== null) {
-      this.myData = JSON.parse(localStorage.getItem('myinfo24-data'))
-      this.myData = this.myData.filter((i) => !(i === null)) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
-    } else {
-      this.myData = []
-    }
-    if (localStorage.getItem('myinfo24-userName') !== null) {
-      this.userName = localStorage.getItem('myinfo24-userName')
-      if (this.userName === null) {
-        this.userName = ''
-      }
-    }
-
-    this.getFromFirestore()
-
-    this.setPosToItems(null)
-
-    setInterval(() => {
-      this.dateNotification()
-    }, 60000)
-  },
-  methods: {
+      this.units = this.units.concat(unitsPer)
+    },
     shownData () {
       if (this.withDeletedItems) {
         return this.myData
@@ -729,7 +732,7 @@ export default {
       return found
     },
     unitNames () {
-      return this.units().map((u) => u.name)
+      return this.units.map((u) => u.name)
     },
     pathArray (item) {
       const array = []
@@ -749,6 +752,16 @@ export default {
         path += i.name
         path += ' > '
       })
+      path += this.isNull(item.name)
+      return path
+    },
+    pathStringReverse (item) {
+      let path = ''
+      const items = this.pathArray(item)
+      for (let index = items.length - 1; index >= 0; index--) {
+        path += items[index].name
+        path += ' < '
+      }
       path += this.isNull(item.name)
       return path
     },
@@ -860,8 +873,8 @@ export default {
             this.editedItem.unit = this.currentItem.unit.split('/')[0]
           } else {
             this.editedItem.unit = this.currentItem.unit.split('/')[1]
-            if (this.units().find((u) => u.singular === this.editedItem.unit)) {
-              this.editedItem.unit = this.units().find(
+            if (this.units.find((u) => u.singular === this.editedItem.unit)) {
+              this.editedItem.unit = this.units.find(
                 (u) => u.singular === this.editedItem.unit
               ).name
             }
@@ -1046,6 +1059,13 @@ export default {
 
         this.storeData()
 
+        // Die letzte Einheit nach oben setzen
+        if (item.unit) {
+          const unit = this.units.find(u => u.name === item.unit)
+          this.units.splice(this.units.indexOf(unit), 1)
+          this.units.unshift(unit)
+        }
+
         this.editedItem = null
         this.cutedItem = null
         this.copiedItem = null
@@ -1164,9 +1184,9 @@ export default {
       if (unitName) {
         unit = { name: unitName, base: null, value: 1 }
         unitName.split('/').forEach((name) => {
-          let oneUnit = this.units().find((u) => u.name === name)
+          let oneUnit = this.units.find((u) => u.name === name)
           if (!oneUnit) {
-            oneUnit = this.units().find((u) => u.singular === name)
+            oneUnit = this.units.find((u) => u.singular === name)
           }
           if (!unit.base) {
             if (oneUnit.base) {
