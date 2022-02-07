@@ -21,6 +21,9 @@
       <v-btn v-if="currentItem && !editedItem" text small @click="modifyItem(currentItem)">
         <v-icon>mdi-pencil</v-icon>
       </v-btn>
+      <v-btn v-if="currentItem && !editedItem" text small @click="deleteItem(currentItem)">
+        <v-icon>mdi-delete</v-icon>
+      </v-btn>
       <v-btn v-if="editedItem" text small @click="save(editedItem)">
         <v-icon>mdi-content-save</v-icon>
       </v-btn>
@@ -143,10 +146,10 @@
                     <v-list-item-icon/>
                     <v-list-item-content  @click="selectItem(item)">
                       <b v-if="new Date(item.date) <= new Date()">
-                        {{ new Date(item.date).toLocaleDateString() }}
+                        {{ getDateTimeString(item) }}
                       </b>
                       <div v-else>
-                        {{ new Date(item.date).toLocaleDateString() }}
+                        {{ getDateTimeString(item) }}
                       </div>
                       <v-list-item-subtitle>
                         {{ pathStringForDate(item) }}
@@ -231,6 +234,13 @@
                 hide-details
                 label="Termin"
                 type="date"
+                @keydown="editFormKeydown"
+              />
+              <v-text-field
+                v-model="editedItem.time"
+                hide-details
+                label="Uhrzeit"
+                type="time"
                 @keydown="editFormKeydown"
               />
               <v-text-field
@@ -426,8 +436,12 @@ export default {
     // Termin-Nachricht
     dateNotification () {
       this.dateList().filter(i => !i.dateNotified && this.getDate(i.date) <= new Date()).forEach(item => {
-        item.dateNotified = true
-        this.displayNotification('Termin: ' + this.showItem(item))
+        const d = new Date()
+        d.setMinutes(d.getMinutes() + 15)
+        if (!item.time || item.time < d.toLocaleTimeString()) {
+          item.dateNotified = true
+          this.displayNotification('Termin: ' + this.getDateTimeString(item) + ' ' + this.showItem(item))
+        }
       })
     },
     selectedIndex () {
@@ -767,16 +781,20 @@ export default {
     },
     pathStringForDate (item) {
       let path = null
-      this.pathArray(item).forEach((i) => {
-        if (path === null && (!this.currentItem || i === this.currentItem)) {
-          path = ''
-        }
-        if (path !== null && (!this.currentItem || i !== this.currentItem)) {
-          path += i.name
-          path += ' > '
-        }
-      })
-      path += this.isNull(item.name)
+      if (item.parentId) {
+        this.pathArray(item).forEach((i) => {
+          if (path === null && (!this.currentItem || i === this.currentItem)) {
+            path = ''
+          }
+          if (path !== null && (!this.currentItem || i !== this.currentItem)) {
+            path += i.name
+            path += ' > '
+          }
+        })
+        path += this.isNull(item.name)
+      } else {
+        path = this.isNull(item.name)
+      }
       return path
     },
     childrenString (item) {
@@ -840,7 +858,7 @@ export default {
     // Gibt die Zusatz-Infos als String zurück
     showItemAdditive (item) {
       return this.getDate(item.timeStamp).toLocaleDateString() + (item.user ? ' ' + item.user : '') +
-        (item.date ? ', Termin: ' + new Date(item.date).toLocaleDateString() + ' ' + this.isNull(item.responsible) : '')
+        (item.date ? ', Termin: ' + this.getDateTimeString(item) + ' ' + this.isNull(item.responsible) : '')
     },
     goBack () {
       if (this.selectedItem || this.editedItem || this.cutedItem) {
@@ -1163,6 +1181,7 @@ export default {
             this.setUnreadAndNotification(item)
           }
           Object.assign(foundItem, item)
+          delete foundItem.dateNotified
         }
       }
       if (item.unread) {
@@ -1267,6 +1286,9 @@ export default {
       } else {
         return new Date(0)
       }
+    },
+    getDateTimeString (item) {
+      return new Date(item.date).toLocaleDateString() + (item.time ? ' ' + item.time : '')
     }
   }
 }
