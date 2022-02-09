@@ -452,6 +452,7 @@ export default {
       let multiplierUnit = null
       let multiplier1 = 1
       let multiplier2 = 1
+      let multiplier3 = 1
       let divisorUnit = null
       let divisor = 1
       let percent = 100
@@ -478,46 +479,60 @@ export default {
           } else {
             if (parentItem.unit) {
               items.forEach((item) => {
-                if (item.linkId) {
-                  item = this.getItemById(item.linkId)
-                }
-                if (item && item.unit) {
-                  const unit = this.getUnitByName(this.baseUnit(item.unit))
-                  if (unit.name.includes('%')) {
-                    if (unit.name.includes('Aufschlag')) {
-                      // eslint-disable-next-line no-eval
-                      percent = eval(item.value) + 100
-                    } else {
-                      percent = item.value
-                    }
-                  } else {
-                    // eslint-disable-next-line no-eval
-                    const value = this.baseValue(item.unit, eval(this.calculatedValue(item)))
-                    if (parentItem.unit && parentItem.unit.includes('/')) {
-                      if (unit.base.split('/')[0] === multiplierUnit.name) {
-                        multiplier1 = value // * unit.value
-                      }
-                      if (unit.base.includes('/') && unit.base.split('/')[1] === divisorUnit.name) {
-                        multiplier2 = value
+                for (let index = 0; index < 2; index++) {
+                  // Wenn Zahl und Verknüpfung gefüllt ist, dann rechnen
+                  if (index === 0 && !item.value) {
+                    index = 1
+                  }
+                  if (index === 1 && item.linkId) {
+                    item = this.getItemById(item.linkId)
+                  }
+
+                  if (item) {
+                    if (item.unit) {
+                      const unit = this.getUnitByName(this.baseUnit(item.unit))
+                      if (unit.name.includes('%')) {
+                        if (unit.name.includes('Aufschlag')) {
+                          // eslint-disable-next-line no-eval
+                          percent = eval(item.value) + 100
+                        } else {
+                          percent = item.value
+                        }
                       } else {
-                        if (unit.base.split('/')[0] === divisorUnit.name) {
-                          divisor = value // * unit.value
+                        // eslint-disable-next-line no-eval
+                        const value = this.baseValue(item.unit, eval(this.calculatedValue(item)))
+                        if (parentItem.unit && parentItem.unit.includes('/')) {
+                          if (unit.base.split('/')[0] === multiplierUnit.name) {
+                            multiplier1 = value // * unit.value
+                          }
+                          if (unit.base.includes('/') && unit.base.split('/')[1] === divisorUnit.name) {
+                            multiplier2 = value
+                          } else {
+                            if (unit.base.split('/')[0] === divisorUnit.name) {
+                              divisor = value // * unit.value
+                            }
+                          }
+                        } else {
+                          if (item.unit) {
+                            if (!item.unit.includes('/')) {
+                              multiplier1 = value // * unit.value
+                            }
+                            if (item.unit.includes('/')) {
+                              multiplier2 = value // * unit.value
+                            }
+                          }
                         }
                       }
                     } else {
-                      if (item.unit) {
-                        if (!item.unit.includes('/')) {
-                          multiplier1 = value // * unit.value
-                        }
-                        if (item.unit.includes('/')) {
-                          multiplier2 = value // * unit.value
-                        }
+                      if (item.value) {
+                        // eslint-disable-next-line no-eval
+                        multiplier3 = eval(item.value)
                       }
                     }
                   }
                 }
               })
-              calcValue = (multiplier1 * multiplier2) / divisor
+              calcValue = (multiplier1 * multiplier2 * multiplier3) / divisor
               calcValue = calcValue * (percent / 100)
             }
           }
@@ -762,11 +777,13 @@ export default {
     },
     pathString (item) {
       let path = ''
-      this.pathArray(item).forEach((i) => {
-        path += i.name
-        path += ' > '
-      })
-      path += this.isNull(item.name)
+      if (item) {
+        this.pathArray(item).forEach((i) => {
+          path += i.name
+          path += ' > '
+        })
+        path += this.isNull(item.name)
+      }
       return path
     },
     pathStringReverse (item) {
@@ -985,6 +1002,13 @@ export default {
       } else {
         item.deleted = true
         this.save(item)
+      }
+      if (item === this.currentItem) {
+        if (this.currentItem.parentId) {
+          this.currentItem = this.getItemById(this.currentItem.parentId)
+        } else {
+          this.currentItem = null
+        }
       }
     },
     restoreItem (item) {
