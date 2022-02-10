@@ -385,7 +385,8 @@ export default {
         { name: 'kWh' },
         { name: 'Los' },
         { name: '% Aufschlag' },
-        { name: '% Anteil' }
+        { name: '% Anteil' },
+        { name: 'Faktor' }
       ]
       const unitsPer = []
       this.units.forEach((u1) => {
@@ -464,10 +465,10 @@ export default {
         }
 
         const items = this.shownData().filter(
-          (i) => i.parentId === parentItem.id
+          (i) => i.parentId === parentItem.id && !(i.unit && i.unit === 'Faktor')
         )
 
-        if (items.length >= 1) {
+        if (items.length > 0) {
           if (
             items.filter(
               (i) => this.baseUnit(i.unit) === this.baseUnit(parentItem.unit)
@@ -532,15 +533,25 @@ export default {
                   }
                 }
               })
+
               calcValue = (multiplier1 * multiplier2 * multiplier3) / divisor
               calcValue = calcValue * (percent / 100)
             }
           }
         }
+
         if (!calcValue) {
           calcValue = parentItem.value
         } else {
           calcValue = this.originValue(parentItem.unit, calcValue)
+
+          const itemFactor = this.shownData().find(
+            (i) => i.parentId === parentItem.id && i.unit && i.unit === 'Faktor'
+          )
+          if (itemFactor && itemFactor.value) {
+            // eslint-disable-next-line no-eval
+            calcValue *= eval(itemFactor.value)
+          }
         }
       }
 
@@ -713,7 +724,7 @@ export default {
     },
     searchItem () {
       if (this.searchText.substring(0, 4) === 'ID: ') {
-        const cloudItem = this.cloudItems.find(i => this.searchText.substring(4) === i.id)
+        const cloudItem = this.cloudItems.find(i => this.searchText.substring(4).trim() === i.id)
         if (cloudItem) {
           this.searchText = ''
 
