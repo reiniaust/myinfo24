@@ -7,6 +7,7 @@
       <v-btn text @click="refreshApp">Update</v-btn>
     </v-snackbar>
     <v-app-bar app color="primary" dark>
+      <button @click="openLink()">Link öffnen</button>
       <v-btn
         :disabled="navigateList.length === 0 && !selectedItem  && !editedItem"
         text
@@ -226,7 +227,7 @@
 
             <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
-              <v-textarea v-model="editedItem.name" label="Inhalt" autofocus rows="3"></v-textarea>
+              <v-textarea v-model="editedItem.name" label="Inhalt" autofocus rows="2"></v-textarea>
               <v-text-field v-model="numberEdit" label="Zahl oder Ausdruck (z.B. 1,5 * 3)" @keydown="editFormKeydown"></v-text-field>
               <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
               <v-text-field
@@ -363,6 +364,8 @@ export default {
     }, 60000)
   },
   methods: {
+    openLink () {
+    },
     setUnits () {
       this.units = [
         { name: '' },
@@ -453,7 +456,6 @@ export default {
       let multiplierUnit = null
       let multiplier1 = 1
       let multiplier2 = 1
-      let multiplier3 = 1
       let divisorUnit = null
       let divisor = 1
       let percent = 100
@@ -524,17 +526,12 @@ export default {
                           }
                         }
                       }
-                    } else {
-                      if (item.value) {
-                        // eslint-disable-next-line no-eval
-                        multiplier3 = eval(item.value)
-                      }
                     }
                   }
                 }
               })
 
-              calcValue = (multiplier1 * multiplier2 * multiplier3) / divisor
+              calcValue = (multiplier1 * multiplier2) / divisor
               calcValue = calcValue * (percent / 100)
             }
           }
@@ -723,7 +720,7 @@ export default {
       }
     },
     searchItem () {
-      if (this.searchText.substring(0, 4) === 'ID: ') {
+      if (this.searchText.startsWith('ID: ')) {
         const cloudItem = this.cloudItems.find(i => this.searchText.substring(4).trim() === i.id)
         if (cloudItem) {
           this.searchText = ''
@@ -864,6 +861,10 @@ export default {
         this.storeData()
       }
       this.searchText = ''
+
+      if (item.name && item.name.startsWith('https:')) {
+        window.open(item.name)
+      }
     },
     getItemById (id) {
       return this.myData.find((i) => i.id === id)
