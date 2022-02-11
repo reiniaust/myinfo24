@@ -7,7 +7,6 @@
       <v-btn text @click="refreshApp">Update</v-btn>
     </v-snackbar>
     <v-app-bar app color="primary" dark>
-      <button @click="openLink()">Link öffnen</button>
       <v-btn
         :disabled="navigateList.length === 0 && !selectedItem  && !editedItem"
         text
@@ -73,6 +72,7 @@
 
     <v-main class="ma-8">
       <div class="mb-2">
+
         <v-row>
           <v-text-field v-model="searchText" label="Suche" @keydown="searchInputKeydown"></v-text-field>
           <v-btn text @click="searchItem">
@@ -228,27 +228,6 @@
             <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
               <v-textarea v-model="editedItem.name" label="Inhalt" autofocus rows="2"></v-textarea>
-              <v-text-field v-model="numberEdit" label="Zahl oder Ausdruck (z.B. 1,5 * 3)" @keydown="editFormKeydown"></v-text-field>
-              <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
-              <v-text-field
-                v-model="editedItem.date"
-                hide-details
-                label="Termin"
-                type="date"
-                @keydown="editFormKeydown"
-              />
-              <v-text-field
-                v-model="editedItem.time"
-                hide-details
-                label="Uhrzeit"
-                type="time"
-                @keydown="editFormKeydown"
-              />
-              <v-text-field
-                v-model="editedItem.responsible"
-                label="Zuständig"
-                @keydown="editFormKeydown"
-              />
               <v-autocomplete
                 v-model="editedItem.linkId"
                 label="Verknüpfung"
@@ -260,8 +239,49 @@
                 item-value="id"
                 item-text="name"
               ></v-autocomplete>
-              <v-checkbox v-if="!itemHasChildrenInCloud(editedItem)" v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
-              <v-checkbox v-if="editedItem.toCloud" v-model="sendNotification" label="Andere benachrichtigen"></v-checkbox>
+              <v-row>
+                <v-col>
+                  <v-text-field v-model="numberEdit" label="Zahl oder Ausdruck (z.B. 1,5 * 3)" @keydown="editFormKeydown"></v-text-field>
+                </v-col>
+                <v-col>
+                  <v-autocomplete v-model="editedItem.unit" :items="unitNames()" label="Einheit"></v-autocomplete>
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <v-text-field
+                    v-model="editedItem.date"
+                    hide-details
+                    label="Termin"
+                    type="date"
+                    @keydown="editFormKeydown"
+                  />
+                </v-col>
+                <v-col>
+                  <v-text-field
+                    v-model="editedItem.time"
+                    hide-details
+                    label="Uhrzeit"
+                    type="time"
+                    @keydown="editFormKeydown"
+                  />
+                </v-col>
+                <v-col>
+                  <v-text-field
+                    v-model="editedItem.responsible"
+                    label="Zuständig"
+                    @keydown="editFormKeydown"
+                  />
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <v-checkbox v-if="!itemHasChildrenInCloud(editedItem)" v-model="editedItem.toCloud" label="In Cloud speichern"></v-checkbox>
+                </v-col>
+                <v-col>
+                  <v-checkbox v-if="editedItem.toCloud" v-model="sendNotification" label="Andere benachrichtigen"></v-checkbox>
+                </v-col>
+              </v-row>
             </v-form>
           </v-list-item-group>
         </v-list>
@@ -364,8 +384,6 @@ export default {
     }, 60000)
   },
   methods: {
-    openLink () {
-    },
     setUnits () {
       this.units = [
         { name: '' },
