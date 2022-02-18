@@ -153,7 +153,7 @@
                         {{ getDateTimeString(item) }}
                       </div>
                       <v-list-item-subtitle>
-                        {{ pathStringForDate(item) }}
+                        {{ pathStringForCurrent(item) }}
                       </v-list-item-subtitle>
                     </v-list-item-content>
                   </v-list-item>
@@ -161,7 +161,9 @@
               </v-list>
 
               <v-list-item v-for="(item, i) in currentItems()" :key="i">
-                <v-list-item-content :class="item.unread ? 'font-weight-bold' : ''">
+                <v-list-item-content :class="item.unread ? 'font-weight-bold' : ''"
+                    @click="selectItem(item)"
+                >
                   <div
                     color="primary"
                     :class="item.deleted ? 'text-decoration-line-through' : ''"
@@ -179,12 +181,10 @@
                         ? ' -> ' + showItem(getItemById(item.linkId))
                         : '')
                     "
-                    @click="selectItem(item)"
                   ></div>
                   <v-list-item-subtitle
-                    v-if="childrenString(item) !== ''"
-                    @click="selectItem(item)"
-                  >{{ childrenString(item) }}</v-list-item-subtitle>
+                    v-if="childrenString(item) !== '' || item.date"
+                  >{{ (item.date ? 'Termin: ' + getDateTimeString(item) + (childrenString(item) !== '' ? ', ' : '') : '') + childrenString(item) }}</v-list-item-subtitle>
                 </v-list-item-content>
 
                 <!-- Löschen -->
@@ -232,9 +232,9 @@
                 v-model="editedItem.linkId"
                 label="Verknüpfung"
                 :items="
-                  myData.map((i) => {
-                    return { id: i.id, name: pathStringReverse(i) };
-                  })
+                  shownData().map((i) => {
+                    return { id: i.id, name: pathStringForCurrent(i) };
+                  }).filter(i => i.name).sort((a, b) => ('' + a.name).localeCompare(b.name))
                 "
                 item-value="id"
                 item-text="name"
@@ -453,7 +453,7 @@ export default {
     dateList () {
       return this.shownData().filter((i) => i.date && (!i.responsible || i.responsible.toUpperCase().includes(this.userName.toUpperCase())) &&
         (!this.currentItem || this.pathArray(i).find(p => p.id === this.currentItem.id)))
-        .sort((a, b) => this.getDate(a.date) - this.getDate(b.date))
+        .sort((a, b) => this.getDate(a.date + (a.time ? a.time : '')) - this.getDate(b.date + (b.time ? b.time : '')))
     },
     // Termin-Nachricht
     dateNotification () {
@@ -520,28 +520,32 @@ export default {
                           percent = item.value
                         }
                       } else {
+                        try {
                         // eslint-disable-next-line no-eval
-                        const value = this.baseValue(item.unit, eval(this.calculatedValue(item)))
-                        if (parentItem.unit && parentItem.unit.includes('/')) {
-                          if (unit.base.split('/')[0] === multiplierUnit.name) {
-                            multiplier1 = value // * unit.value
-                          }
-                          if (unit.base.includes('/') && unit.base.split('/')[1] === divisorUnit.name) {
-                            multiplier2 = value
-                          } else {
-                            if (unit.base.split('/')[0] === divisorUnit.name) {
-                              divisor = value // * unit.value
-                            }
-                          }
-                        } else {
-                          if (item.unit) {
-                            if (!item.unit.includes('/')) {
+                          const value = this.baseValue(item.unit, eval(this.calculatedValue(item)))
+                          if (parentItem.unit && parentItem.unit.includes('/')) {
+                            if (unit.base.split('/')[0] === multiplierUnit.name) {
                               multiplier1 = value // * unit.value
                             }
-                            if (item.unit.includes('/')) {
-                              multiplier2 = value // * unit.value
+                            if (unit.base.includes('/') && unit.base.split('/')[1] === divisorUnit.name) {
+                              multiplier2 = value
+                            } else {
+                              if (unit.base.split('/')[0] === divisorUnit.name) {
+                                divisor = value // * unit.value
+                              }
+                            }
+                          } else {
+                            if (item.unit) {
+                              if (!item.unit.includes('/')) {
+                                multiplier1 = value // * unit.value
+                              }
+                              if (item.unit.includes('/')) {
+                                multiplier2 = value // * unit.value
+                              }
                             }
                           }
+                        } catch (e) {
+                          alert(e.toString())
                         }
                       }
                     }
@@ -621,6 +625,14 @@ export default {
       }
     },
     displayNotification (msg) {
+      /*
+      const notifi = new Notification()
+
+      notifi.onclick = function (event) {
+        event.notification.close()
+      }
+      */
+
       Notification.requestPermission(function (status) {
         console.log('Notification permission status:', status)
       })
@@ -638,20 +650,9 @@ export default {
               data: {
                 dateOfArrival: Date.now(),
                 primaryKey: 1
-              },
-              actions: [
-                {
-                  action: 'explore',
-                  title: 'App öffnen',
-                  icon: './static/img/checkmark.png'
-                },
-                {
-                  action: 'close',
-                  title: 'Schließen',
-                  icon: './static/img/xmark.png'
-                }
-              ]
+              }
             }
+
             reg.showNotification('myinfo24', options)
           })
       }
@@ -812,29 +813,21 @@ export default {
       }
       return path
     },
-    pathStringReverse (item) {
-      let path = ''
-      const items = this.pathArray(item)
-      for (let index = items.length - 1; index >= 0; index--) {
-        path += items[index].name
-        path += ' < '
-      }
-      path += this.isNull(item.name)
-      return path
-    },
-    pathStringForDate (item) {
+    pathStringForCurrent (item) {
       let path = null
       if (item.parentId) {
         this.pathArray(item).forEach((i) => {
           if (path === null && (!this.currentItem || i === this.currentItem)) {
-            path = ''
+            path = '> '
           }
           if (path !== null && (!this.currentItem || i !== this.currentItem)) {
-            path += i.name
+            path += (i.name ? i.name : (i.linkId ? this.getItemById(i.linkId) : ''))
             path += ' > '
           }
         })
-        path += this.isNull(item.name)
+        if (path !== null) {
+          path += this.isNull(item.name)
+        }
       } else {
         path = this.isNull(item.name)
       }
