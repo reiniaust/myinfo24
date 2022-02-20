@@ -116,13 +116,13 @@
             <div v-if="!editedItem">
 
               <!-- Änderungsprotokoll -->
-              <v-list v-if="currentArchive().length > 0">
+              <v-list v-if="archiveItems.length > 0">
                 <v-list-group
                 >
                   <template v-slot:activator>
                     <v-list-item-title>📝 Protokoll</v-list-item-title>
                   </template>
-                  <v-list-item v-for="(item, i) in currentArchive()" :key="i">
+                  <v-list-item v-for="(item, i) in archiveItems" :key="i">
                     <v-list-item-icon/>
                     <v-list-item-content>
                       <div>
@@ -314,7 +314,7 @@ export default {
     updateExists: false,
     myData: [],
     cloudItems: null,
-    archiveItems: null,
+    archiveItems: [],
     withDeletedItems: false,
     selectedItem: null,
     selIndex: null,
@@ -330,6 +330,7 @@ export default {
     searchText: '',
     searchTextOld: '',
     searchIndex: 0,
+    archiveRef: null,
     itemActions: [
       { action: 'delete', icon: 'mdi-delete' },
       { action: 'moveUp', icon: 'mdi-arrow-up' },
@@ -447,7 +448,8 @@ export default {
       return items.sort((a, b) => a.pos - b.pos)
     },
     currentArchive () {
-      return this.currentItem ? this.archiveItems.filter(i => i.id === this.currentItem.id) : []
+      // return this.currentItem ? this.archiveItems.filter(i => i.id === this.currentItem.id) : []
+      return this.archiveItems
     },
     // Terminliste
     dateList () {
@@ -690,7 +692,7 @@ export default {
         .firestore()
         .collection('data')
 
-      const archiveRef = await firebase
+      this.archiveRef = await firebase
         .firestore()
         .collection('archive')
 
@@ -708,13 +710,15 @@ export default {
           }
         })
 
-        archiveRef.onSnapshot(snap => {
+        /*
+        this.archiveRef.onSnapshot(snap => {
           this.archiveItems = []
           snap.forEach(doc => {
             const item = doc.data()
             this.archiveItems.push(item)
           })
         })
+        */
 
         // Hilfe hinzufügen
         const helpItem = this.cloudItems.find(i => i.id === '2021-11-16T18:27:35.008Z')
@@ -759,6 +763,7 @@ export default {
             alert('Ende erreicht.')
           }
           this.currentItem = searchFilter[this.searchIndex]
+          this.getArchive(this.currentItem)
         } else {
           alert('Nicht gefunden.')
         }
@@ -857,6 +862,8 @@ export default {
       }
     },
     selectItem (item) {
+      this.archiveItems = []
+
       if (this.currentItem) {
         if (
           this.currentItem !== this.navigateList[this.navigateList.length - 1]
@@ -867,6 +874,9 @@ export default {
         this.navigateList.push(null)
       }
       this.currentItem = item
+
+      this.getArchive(item)
+
       if (item && item.unread) {
         delete item.unread
         this.storeData()
@@ -876,6 +886,18 @@ export default {
       if (item.name && item.name.startsWith('https:')) {
         window.open(item.name)
       }
+    },
+    getArchive (item) {
+      const query = this.archiveRef.where('id', '==', item.id)
+      const thisMain = this
+      query
+        .get()
+        .then(function (snapshot) {
+          snapshot.forEach(function (doc) {
+            thisMain.archiveItems.push(doc.data())
+            thisMain.archiveItems.sort((a, b) => thisMain.getDate(a.timeStamp) - thisMain.getDate(b.timeStamp))
+          })
+        })
     },
     getItemById (id) {
       return this.myData.find((i) => i.id === id)
@@ -909,6 +931,8 @@ export default {
         const len = this.navigateList.length
         this.currentItem = this.navigateList[len - 1]
         this.navigateList.splice(len - 1, 1)
+
+        this.getArchive(this.currentItem)
       }
       this.selIndex = null
       this.newItemName = ''
@@ -1019,7 +1043,7 @@ export default {
       }
     },
     deleteItem (item) {
-      if (item.toCloud && !item.parentId) {
+      if (item.deleted || (item.toCloud && !item.parentId)) {
         this.myData.splice(this.myData.indexOf(item), 1)
         this.storeData()
       } else {
@@ -1029,6 +1053,7 @@ export default {
       if (item === this.currentItem) {
         if (this.currentItem.parentId) {
           this.currentItem = this.getItemById(this.currentItem.parentId)
+          this.getArchive(this.currentItem)
         } else {
           this.currentItem = null
         }
