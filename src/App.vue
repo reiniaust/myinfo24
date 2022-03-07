@@ -95,7 +95,9 @@
           <v-list-item-group
             v-model="selIndex"
           >
-            <div v-if="!(editedItem && editedItem.id)" class="mb-2">
+            <div v-if="!(editedItem && editedItem.id)" class="mb-2"
+              @click.right="openWindow(currentItem, true)"
+            >
               <h3>{{ currentItem ? showItem(currentItem) : "Home" }}</h3>
               <v-list-item-subtitle
                 v-if="currentItem && currentItem.timeStamp"
@@ -331,6 +333,7 @@ export default {
     searchTextOld: '',
     searchIndex: 0,
     archiveRef: null,
+    nodejsHost: 'http://localhost:1024/?cmd=',
     itemActions: [
       { action: 'delete', icon: 'mdi-delete' },
       { action: 'moveUp', icon: 'mdi-arrow-up' },
@@ -366,6 +369,8 @@ export default {
     if (localStorage.getItem('myinfo24-data') !== null) {
       this.myData = JSON.parse(localStorage.getItem('myinfo24-data'))
       this.myData = this.myData.filter((i) => !(i === null)) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
+      // this.myData = this.myData.filter((i) => (i.name && i.name.includes('z'))) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
+      this.myData = this.myData.filter((i) => !this.isLost(i) || i.unread)
     } else {
       this.myData = []
     }
@@ -383,6 +388,13 @@ export default {
     setInterval(() => {
       this.dateNotification()
     }, 60000)
+
+    /*
+    const thisMain = this
+    setTimeout(() => {
+      thisMain.myData = thisMain.myData.filter((i) => !thisMain.isDeleted(i) || i.unread)
+    }, 10000)
+    */
   },
   methods: {
     setUnits () {
@@ -435,6 +447,19 @@ export default {
       } else {
         return this.myData.filter((i) => !i.deleted || i.unread)
       }
+    },
+    isDeleted (item) {
+      let deleted = false
+      if (item.deleted) {
+        deleted = true
+      } else {
+        this.pathArray(item).forEach(i => {
+          if (i.deleted) {
+            deleted = true
+          }
+        })
+      }
+      return deleted
     },
     currentItems () {
       let items
@@ -749,6 +774,7 @@ export default {
           this.searchText = ''
 
           this.setCloudItemToMydata(cloudItem)
+          this.selectItem(cloudItem)
 
           this.storeData()
         }
@@ -795,15 +821,26 @@ export default {
     unitNames () {
       return this.units.map((u) => u.name)
     },
+    isLost (item) {
+      let lost = false
+      const array = []
+      while (item && item.parentId && !array.find(i => i.id === i.parentId)) {
+        item = this.myData.find((i) => i.id === item.parentId)
+        if (item) {
+          array.unshift(item)
+        } else {
+          lost = true
+        }
+      }
+      return lost
+    },
     pathArray (item) {
       const array = []
-      let count = 0
-      while (count < 10 && item && item.parentId) {
+      while (item && item.parentId && !array.find(i => i.id === i.parentId)) {
         item = this.myData.find((i) => i.id === item.parentId)
         if (item) {
           array.unshift(item)
         }
-        count += 1
       }
       return array
     },
@@ -873,6 +910,9 @@ export default {
       } else {
         this.navigateList.push(null)
       }
+
+      this.openWindow(item)
+
       this.currentItem = item
 
       this.getArchive(item)
@@ -882,9 +922,20 @@ export default {
         this.storeData()
       }
       this.searchText = ''
-
-      if (item.name && item.name.startsWith('https:')) {
-        window.open(item.name)
+    },
+    openWindow (item, runCmd) {
+      if (item && item.name) {
+        const link = item.name.replace('"', '').replace('"', '')
+        if (link.startsWith('http')) {
+          window.open(link)
+        }
+        if (link.substring(1, 2) === ':' || runCmd) {
+          let cmd = this.nodejsHost
+          if (!link.includes('.') && !runCmd) {
+            cmd += 'explorer '
+          }
+          window.open(cmd + link)
+        }
       }
     },
     getArchive (item) {
