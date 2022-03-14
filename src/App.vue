@@ -155,7 +155,7 @@
                         {{ getDateTimeString(item) }}
                       </div>
                       <v-list-item-subtitle>
-                        {{ pathStringForCurrent(item) }}
+                        {{ pathStringReverse(item) }}
                       </v-list-item-subtitle>
                     </v-list-item-content>
                   </v-list-item>
@@ -235,7 +235,7 @@
                 label="Verknüpfung"
                 :items="
                   shownData().map((i) => {
-                    return { id: i.id, name: pathStringForCurrent(i) };
+                    return { id: i.id, name: pathStringReverse(i) };
                   }).filter(i => i.name).sort((a, b) => ('' + a.name).localeCompare(b.name))
                 "
                 item-value="id"
@@ -370,7 +370,7 @@ export default {
       this.myData = JSON.parse(localStorage.getItem('myinfo24-data'))
       this.myData = this.myData.filter((i) => !(i === null)) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
       // this.myData = this.myData.filter((i) => (i.name && i.name.includes('z'))) // Vermeidung von Fehlern, wenn leeres Objekt enthalten ist (4.12.21)
-      this.myData = this.myData.filter((i) => !this.isLost(i) || i.unread)
+      this.myData = this.myData.filter((i) => !this.isLost(this.myData, i) || i.unread)
     } else {
       this.myData = []
     }
@@ -442,11 +442,33 @@ export default {
       this.units = this.units.concat(unitsPer)
     },
     shownData () {
+      // let data
+      let data
       if (this.withDeletedItems) {
-        return this.myData
+        data = this.myData
       } else {
-        return this.myData.filter((i) => !i.deleted || i.unread)
+        data = this.myData.filter((i) => !i.deleted || i.unread)
+        // data = data.filter((i) => !isLost(i) || i.unread)
       }
+      return data
+
+      /*
+      function isLost (item) {
+        let lost = false
+        const array = []
+        let count = 0
+        while (count < 1 && item && item.parentId && !array.find(i => i.id === i.parentId)) {
+          item = data1.find((i) => i.id === item.parentId)
+          if (item) {
+            array.push(item)
+          } else {
+            lost = true
+          }
+          count += 1
+        }
+        return lost
+      }
+      */
     },
     isDeleted (item) {
       let deleted = false
@@ -480,18 +502,25 @@ export default {
     dateList () {
       return this.shownData().filter((i) => i.date && (!i.responsible || i.responsible.toUpperCase().includes(this.userName.toUpperCase())) &&
         (!this.currentItem || this.pathArray(i).find(p => p.id === this.currentItem.id)))
-        .sort((a, b) => this.getDate(a.date + (a.time ? a.time : '')) - this.getDate(b.date + (b.time ? b.time : '')))
+        .sort((a, b) => this.dateSort(a, b))
+    },
+    dateSort (a, b) {
+      const aDate = this.getDate(a.date + (a.time ? 'T' + a.time : ''))
+      const bDate = this.getDate(b.date + (b.time ? 'T' + b.time : ''))
+      return aDate - bDate
     },
     // Termin-Nachricht
     dateNotification () {
-      this.dateList().filter(i => !i.dateNotified && this.getDate(i.date) <= new Date()).forEach(item => {
-        const d = new Date()
-        d.setMinutes(d.getMinutes() + 15)
-        if (!item.time || item.time < d.toLocaleTimeString()) {
-          item.dateNotified = true
-          this.displayNotification('Termin: ' + this.getDateTimeString(item) + ' ' + this.showItem(item))
-        }
-      })
+      if (!this.withDeletedItems) {
+        this.dateList().filter(i => !i.dateNotified && this.getDate(i.date) <= new Date()).forEach(item => {
+          const d = new Date()
+          d.setMinutes(d.getMinutes() + 15)
+          if (!item.time || item.time < d.toLocaleTimeString()) {
+            item.dateNotified = true
+            this.displayNotification('Termin: ' + this.getDateTimeString(item) + ' ' + this.showItem(item))
+          }
+        })
+      }
     },
     selectedIndex () {
       return this.currentItems().indexOf(this.selectedItem)
@@ -821,11 +850,11 @@ export default {
     unitNames () {
       return this.units.map((u) => u.name)
     },
-    isLost (item) {
+    isLost (data, item) {
       let lost = false
       const array = []
       while (item && item.parentId && !array.find(i => i.id === i.parentId)) {
-        item = this.myData.find((i) => i.id === item.parentId)
+        item = data.find((i) => i.id === item.parentId)
         if (item) {
           array.unshift(item)
         } else {
@@ -855,9 +884,36 @@ export default {
       }
       return path
     },
+    pathStringReverse (item) {
+      let path
+      if (item) {
+        this.pathArray(item).forEach((i) => {
+          path = ' < ' + i.name + path
+        })
+      }
+      path = this.isNull(item.name) + path
+      return path
+    },
     pathStringForCurrent (item) {
-      let path = null
-      if (item.parentId) {
+      /*
+      let path = ''
+      // const len = (this.pathArray(item).length > this.pathArray(this.currentItem).length ? this.pathArray(item).length : this.pathArray(this.currentItem).length)
+      for (let index = 0; index < this.pathArray(item).length; index++) {
+        let cuI
+        if (this.currentItem && this.pathArray(this.currentItem).length > index) {
+          cuI = this.pathArray(this.currentItem)[index]
+        }
+        const i = this.pathArray(item)[index]
+        if (!cuI || i !== cuI) {
+          if (path === '' && i > 0) {
+            path = '> '
+          }
+          path += (i.name ? i.name : (i.linkId ? this.getItemById(i.linkId) : ''))
+          path += ' > '
+        }
+        index += 1
+      } */
+      /*
         this.pathArray(item).forEach((i) => {
           if (path === null && (!this.currentItem || i === this.currentItem)) {
             path = '> '
@@ -867,11 +923,14 @@ export default {
             path += ' > '
           }
         })
-        if (path !== null) {
-          path += this.isNull(item.name)
-        }
-      } else {
-        path = this.isNull(item.name)
+      if (path !== null) {
+        path += this.isNull(item.name)
+      }
+      return path
+      */
+      let path = this.pathString(item) + this.isNull(item.name)
+      if (path.startsWith(this.pathString(this.currentItem))) {
+        path = path.substring(this.currentItem.length - 2)
       }
       return path
     },
