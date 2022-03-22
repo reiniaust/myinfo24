@@ -74,7 +74,7 @@
       <div class="mb-2">
 
         <v-row>
-          <v-text-field v-model="searchText" label="Suche" @keydown="searchInputKeydown"></v-text-field>
+          <v-text-field :value="searchText" @change="v => searchText = v" label="Suche" @keydown="searchInputKeydown"></v-text-field>
           <v-btn text @click="searchItem">
             <v-icon>mdi-arrow-right</v-icon>
           </v-btn>
@@ -217,7 +217,7 @@
 
               <v-list-item>
                 <v-list-item-content>
-                  <v-text-field v-model="newItemName" label="Neuer Eintrag" @keydown="newItemNameKeydown"></v-text-field>
+                  <v-text-field v-if="showNewEntryInput" :value="newItemName" @change="v => newItemName = v" label="Neuer Eintrag" @keydown="newItemNameKeydown"></v-text-field>
                 </v-list-item-content>
                 <v-list-item-action>
                   <v-btn icon>
@@ -229,7 +229,7 @@
 
             <v-form v-if="editedItem" class="mt-4">
               <v-text-field v-model="userName" label="Benutzername"></v-text-field>
-              <v-textarea v-model="editedItem.name" label="Inhalt" autofocus rows="2"></v-textarea>
+              <v-textarea :value="editedItem.name" @change="v => editedItem.name = v" label="Inhalt" autofocus rows="2"></v-textarea>
               <v-autocomplete
                 v-model="editedItem.linkId"
                 label="Verknüpfung"
@@ -322,6 +322,7 @@ export default {
     selIndex: null,
     currentItem: null,
     newItemName: '',
+    showNewEntryInput: true,
     editedItem: null,
     userName: '',
     sendNotification: false,
@@ -388,6 +389,10 @@ export default {
     setInterval(() => {
       this.dateNotification()
     }, 60000)
+
+    setInterval(() => {
+      this.showNewEntryInput = true
+    }, 1000)
 
     /*
     const thisMain = this
@@ -885,7 +890,7 @@ export default {
       return path
     },
     pathStringReverse (item) {
-      let path
+      let path = ''
       if (item) {
         this.pathArray(item).forEach((i) => {
           path = ' < ' + i.name + path
@@ -1091,6 +1096,7 @@ export default {
       this.setNewItem()
       this.editedItem.name = this.newItemName
       this.newItemName = ''
+      this.showNewEntryInput = false
       this.save(this.editedItem)
     },
     modifyItem (item) {
